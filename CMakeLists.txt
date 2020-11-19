@@ -1,19 +1,53 @@
-cmake_minimum_required(VERSION 3.10)
-project(cppparsec)
+cmake_minimum_required(VERSION 3.5)
 
-include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag("-std-c++17" COMPILER_SUPPORTS_CXX17)
-check_cxx_compiler_flag("-std-c++1x" COMPILER_SUPPORTS_CXX1Y)
+project(cppparsec VERSION 1.0
+                  DESCRIPTION "a monadic parser combinator libary"
+                  LANGUAGES CXX)
 
-if(COMPILER_SUPPORTS_CXX17)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
-elseif(COMPILER_SUPPORTS_CXX1Y)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y")
-else()
-  message(STATUS "The compiler ${CMAKE_CXX_COMPILER} a has no c++17 support.")
+message("CMAKE_BUILD_TYPE is ${CMAKE_BUILD_TYPE}")
+
+# options
+option(CPPPARSEC_BUILD_FUZZER "Build fuzzer tests.")
+option(CPPPARSEC_BUILD_TEST "Build unit tests")
+option(CPPPARSEC_BUILD_DEMO "Build demo programs")
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20")
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "") # works
+
+# header only lib
+include(CMakePackageConfigHelpers)
+
+add_library(cppparsec INTERFACE)
+add_library(cppparsec::cppparsec ALIAS cppparsec)
+target_include_directories(cppparsec INTERFACE
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/cppparsec>)
+
+set_target_properties(cppparsec PROPERTIES
+  C_VISIBILITY_PRESET       hidden
+  CXX_VISIBILITY_PRESET     hidden
+  VISIBILITY_INLINES_HIDDEN YES
+  )
+
+if (CPPPARSEC_BUILD_FUZZER AND CPPPARSEC_BUILD_TEST)
+  message(FATAL_ERROR
+    "Can't build fuzzer and test together. Please choose one.")
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
-set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
+# test targets
+if(CPPPARSEC_BUILD_FUZZER)
+  message("cppparsec: Building fuzz tests")
+  add_subdirectory(fuzzer)
+endif()
 
-add_subdirectory(test)
+if (CPPPARSEC_BUILD_TEST)
+  message("cppparsec: Building unit tests")
+  add_subdirectory(test)
+endif()
+
+if (CPPPARSEC_BUILD_DEMO)
+  message("cppparsec: Building demo")
+  add_subdirectory(demo)
+endif()
