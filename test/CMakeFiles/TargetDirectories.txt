@@ -1,3 +1,0 @@
-/home/jimmy/newDisk/Repo/cppparsec/test/CMakeFiles/rebuild_cache.dir
-/home/jimmy/newDisk/Repo/cppparsec/test/CMakeFiles/edit_cache.dir
-/home/jimmy/newDisk/Repo/cppparsec/test/CMakeFiles/test.dir
