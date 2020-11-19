@@ -1,0 +1,12 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/jimmy/newDisk/Repo/cppparsec/test/test.cc
+cppparsec.h
+/home/jimmy/newDisk/Repo/cppparsec/test/cppparsec.h
+

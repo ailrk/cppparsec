@@ -1,0 +1,1 @@
+/usr/bin/c++ -rdynamic CMakeFiles/test.dir/test.o -o test   -L$(cppparsec_BINARY_DIR)/lib 

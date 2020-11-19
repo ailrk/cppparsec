@@ -1,0 +1,75 @@
+Performing C++ SOURCE FILE Test COMPILER_SUPPORTS_CXX17 failed with the following output:
+Change Dir: /home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_7cb56/fast && /usr/bin/make  -f CMakeFiles/cmTC_7cb56.dir/build.make CMakeFiles/cmTC_7cb56.dir/build
+make[1]: Entering directory '/home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_7cb56.dir/src.cxx.o
+/usr/bin/c++   -DCOMPILER_SUPPORTS_CXX17   -std-c++17 -o CMakeFiles/cmTC_7cb56.dir/src.cxx.o -c /home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-std-c++17'; did you mean '-std=c++17'?
+make[1]: *** [CMakeFiles/cmTC_7cb56.dir/build.make:85: CMakeFiles/cmTC_7cb56.dir/src.cxx.o] Error 1
+make[1]: Leaving directory '/home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp'
+make: *** [Makefile:140: cmTC_7cb56/fast] Error 2
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_SUPPORTS_CXX1Y failed with the following output:
+Change Dir: /home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_88788/fast && /usr/bin/make  -f CMakeFiles/cmTC_88788.dir/build.make CMakeFiles/cmTC_88788.dir/build
+make[1]: Entering directory '/home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_88788.dir/src.cxx.o
+/usr/bin/c++   -DCOMPILER_SUPPORTS_CXX1Y   -std-c++1x -o CMakeFiles/cmTC_88788.dir/src.cxx.o -c /home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-std-c++1x'; did you mean '-std=c++0x'?
+make[1]: *** [CMakeFiles/cmTC_88788.dir/build.make:85: CMakeFiles/cmTC_88788.dir/src.cxx.o] Error 1
+make[1]: Leaving directory '/home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp'
+make: *** [Makefile:140: cmTC_88788/fast] Error 2
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_SUPPORTS_CXX17 failed with the following output:
+Change Dir: /home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_7110e/fast && /usr/bin/make  -f CMakeFiles/cmTC_7110e.dir/build.make CMakeFiles/cmTC_7110e.dir/build
+make[1]: Entering directory '/home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_7110e.dir/src.cxx.o
+/usr/bin/c++   -DCOMPILER_SUPPORTS_CXX17   -std-c++17 -o CMakeFiles/cmTC_7110e.dir/src.cxx.o -c /home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-std-c++17'; did you mean '-std=c++17'?
+make[1]: *** [CMakeFiles/cmTC_7110e.dir/build.make:85: CMakeFiles/cmTC_7110e.dir/src.cxx.o] Error 1
+make[1]: Leaving directory '/home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp'
+make: *** [Makefile:140: cmTC_7110e/fast] Error 2
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_SUPPORTS_CXX1Y failed with the following output:
+Change Dir: /home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_64002/fast && /usr/bin/make  -f CMakeFiles/cmTC_64002.dir/build.make CMakeFiles/cmTC_64002.dir/build
+make[1]: Entering directory '/home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_64002.dir/src.cxx.o
+/usr/bin/c++   -DCOMPILER_SUPPORTS_CXX1Y   -std-c++1x -o CMakeFiles/cmTC_64002.dir/src.cxx.o -c /home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-std-c++1x'; did you mean '-std=c++0x'?
+make[1]: *** [CMakeFiles/cmTC_64002.dir/build.make:85: CMakeFiles/cmTC_64002.dir/src.cxx.o] Error 1
+make[1]: Leaving directory '/home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp'
+make: *** [Makefile:140: cmTC_64002/fast] Error 2
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_SUPPORTS_CXX14 failed with the following output:
+Change Dir: /home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/make cmTC_83d59/fast && /usr/bin/make  -f CMakeFiles/cmTC_83d59.dir/build.make CMakeFiles/cmTC_83d59.dir/build
+make[1]: Entering directory '/home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_83d59.dir/src.cxx.o
+/usr/bin/c++   -DCOMPILER_SUPPORTS_CXX14   -std-c++14 -o CMakeFiles/cmTC_83d59.dir/src.cxx.o -c /home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-std-c++14'; did you mean '-std=c++14'?
+make[1]: *** [CMakeFiles/cmTC_83d59.dir/build.make:85: CMakeFiles/cmTC_83d59.dir/src.cxx.o] Error 1
+make[1]: Leaving directory '/home/jimmy/newDisk/Repo/cppparsec/CMakeFiles/CMakeTmp'
+make: *** [Makefile:140: cmTC_83d59/fast] Error 2
+
+
+Source file was:
+int main() { return 0; }
