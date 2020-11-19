@@ -3,15 +3,11 @@
 
 int main(int argc, char *argv[]) {
 
-  cppparsec::StringParser<int> q([](std::string s) {
-    cppparsec::StringParser<int>::result_t result;
-    return result;
-  });
-
-  cppparsec::Parser<std::string, int> p([](std::string s) {
-    cppparsec::Parser<std::string, int>::result_t result;
-    return result;
-  });
+  cppparsec::Parser<cppparsec::BasicStringStream, int> p(
+      [](std::string_view s) {
+        cppparsec::Parser<cppparsec::BasicStringStream, int>::result_t result;
+        return result;
+      });
   p.map<double>([](int x) -> double {
      x += 10;
      return (double)x;

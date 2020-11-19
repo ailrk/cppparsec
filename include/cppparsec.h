@@ -1,3 +1,6 @@
+#ifndef CPPPARSEC
+#define CPPPARSEC
+
 #include <cassert>
 #include <functional>
 #include <memory>
@@ -16,7 +19,7 @@ public:
   using source_pos_t = std::tuple<size_t, size_t>; // this can be overrided.
 
   virtual ~SourceStream(){};
-  virtual auto eat(size_t) const -> SourceStream<S> = 0;
+  virtual auto eat(size_t) const -> std::unique_ptr<SourceStream<S>> = 0;
   virtual size_t getLine() const = 0;
   virtual size_t getColumn() const = 0;
   virtual source_item_t getStream() const = 0;
@@ -44,8 +47,9 @@ public:
   size_t getColumn() { return std::get<1>(position); }
   bool isEnd() { return stream.empty(); }
 
-  auto eat(size_t n) -> interface::SourceStream<source_item_t> {
-    return BasicStringStream(stream.substr(n), [=]() {
+  auto eat(size_t n)
+      -> std::unique_ptr<interface::SourceStream<source_item_t>> {
+    return std::make_unique<BasicStringStream>(stream.substr(n), [=]() {
       assert(stream.size() >= n);
       auto new_position{position};
       for (auto i = 0; i < n; ++i) {
@@ -61,13 +65,12 @@ public:
   }
 }; // namespace cppparsec
 
-// S: stream type
+// S: SourceStream
 template <typename S, typename T> class Parser {
 private:
   struct Result {
-    T val;                     // result of current parser
-    std::unique_ptr<S> stream; // current stream state
-    typename S::source_pos_t position;
+    T val;    // result of current parser
+    S stream; // current stream state
   };
 
   // error message
@@ -78,12 +81,14 @@ private:
 
   using PResult = std::variant<Result, Error>;
 
-protected:
-  using run_parser_t_ = std::function<PResult(S)>;
-
 public:
   using result_t = PResult;
-  using Stream = interface::SourceStream<T>;
+  using stream_t = interface::SourceStream<T>;
+
+protected:
+  using run_parser_t_ = std::function<PResult(stream_t)>;
+
+public:
   Parser() = delete;
 
   // move is just in case of passing a lvalue lambda.
@@ -114,7 +119,19 @@ public:
 
 template <typename S, typename T>
 template <typename U>
-auto Parser<S, T>::map(std::function<U(T)> f) -> Parser<S, U> {}
+auto Parser<S, T>::map(std::function<U(T)> f) -> Parser<S, U> {
+  return Parser<S, U>([=](stream_t stream) {
+    auto result = runParser(stream);
+    result.val = f(result.val);
+    return result;
+  });
+}
+
+template <typename S, typename T>
+template <typename U>
+auto Parser<S, T>::pure(U e) -> Parser<S, U> {
+  return Parser<S, U>([=](stream_t stream) { return Result(e, stream); });
+}
 
 // parsing string is very common, we provides a shorthand
 // implemnetation here.
@@ -131,3 +148,5 @@ public:
 };
 
 } // namespace cppparsec
+
+#endif /* ifndef CPPPARSEC */
