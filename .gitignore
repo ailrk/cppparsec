@@ -60,4 +60,7 @@ _deps
 # External projects
 *-prefix/
 
+.clangd/
+.cmake/
+
 # End of https://www.toptal.com/developers/gitignore/api/cmake
