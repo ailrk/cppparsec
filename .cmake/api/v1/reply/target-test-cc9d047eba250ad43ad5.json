@@ -50,13 +50,16 @@
 			[
 				{
 					"fragment" : " -fno-rtti"
+				},
+				{
+					"fragment" : "-std=gnu++17"
 				}
 			],
 			"includes" : 
 			[
 				{
 					"backtrace" : 3,
-					"path" : "/home/jimmy/newDisk/Repo/cppparsec/test/$(cppparsec_SOURCE_DIR)/include"
+					"path" : "/home/jimmy/newDisk/Repo/cppparsec/include"
 				}
 			],
 			"language" : "CXX",
@@ -81,7 +84,7 @@
 			},
 			{
 				"backtrace" : 2,
-				"fragment" : "-L/home/jimmy/newDisk/Repo/cppparsec/test/$(cppparsec_BINARY_DIR)/lib",
+				"fragment" : "-L/home/jimmy/newDisk/Repo/cppparsec/lib",
 				"role" : "libraryPath"
 			}
 		],
