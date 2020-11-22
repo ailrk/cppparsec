@@ -18,6 +18,7 @@ public:
   using StreamItemType = T;
   virtual ~Stream() = default;
   Stream() = default;
+
   Stream(const Stream &) = delete;
   Stream &operator=(const Stream &) = delete;
 
@@ -26,6 +27,7 @@ public:
   virtual const T *peek_stream() const = 0;
   virtual std::unique_ptr<Stream<T>> eat(size_t n) const = 0;
 };
+
 class StringStream : public Stream<std::string_view> {
 
 private:

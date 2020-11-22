@@ -16,15 +16,19 @@ public:
   using InputStreamType = S;
 
   struct Ok {
-    std::unique_ptr<InputStreamType> stream;
+    std::unique_ptr<InputStreamType> stream; // always move.
     T val;
   };
 
   struct Error {
-    std::unique_ptr<InputStreamType> stream;
+    std::unique_ptr<InputStreamType> stream; // always move.
     const std::string error_message;
   };
 
+  // Return type of run_parser.
+  // It can either be Ok indicates parse succeed.
+  // or Error indicates parse failed.
+  // Either case you hae access to the updated stream.
   using Result = std::variant<Ok, Error>;
 
   using RunParserFnType =
