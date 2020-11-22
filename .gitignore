@@ -63,4 +63,5 @@ _deps
 .clangd/
 .cmake/
 
+.ccls-cache/
 # End of https://www.toptal.com/developers/gitignore/api/cmake
