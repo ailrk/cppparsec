@@ -105,7 +105,11 @@ void test_parser_comb3() {
 
   // { // TEST
   //   auto p = SP<int>::pure(1);
-  //   p.then<int>([](auto v) { return SP<int>::pure(2); });
+  //   p.then<int>([](auto v) {
+  //     return SP<int>([](auto stream) {
+  //       return typename SP<int>::Result{std::move(stream), 2};
+  //     });
+  //   });
   // }
 
   std::cout << "TEST: " << test_name << " PASS! " << std::endl;
@@ -113,9 +117,7 @@ void test_parser_comb3() {
 }
 
 // test alternative
-void test_parser_comb4() {
-
-}
+void test_parser_comb4() {}
 
 int main(void) {
   sep();
