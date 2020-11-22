@@ -103,13 +103,18 @@ void test_parser_comb3() {
   using cppparsec::stream::StringStream;
   using std::function;
 
-  { // TEST
-    auto p = SP<int>::pure(1);
-    p.then<int>([](auto v) { return SP<int>::pure(2); });
-  }
+  // { // TEST
+  //   auto p = SP<int>::pure(1);
+  //   p.then<int>([](auto v) { return SP<int>::pure(2); });
+  // }
 
   std::cout << "TEST: " << test_name << " PASS! " << std::endl;
   sep();
+}
+
+// test alternative
+void test_parser_comb4() {
+
 }
 
 int main(void) {

@@ -14,6 +14,7 @@ namespace cppparsec {
 template <typename S, typename T> class Parser {
 public:
   using InputStreamType = S;
+
   struct Ok {
     std::unique_ptr<InputStreamType> stream;
     T val;
@@ -25,6 +26,7 @@ public:
   };
 
   using Result = std::variant<Ok, Error>;
+
   using RunParserFnType =
       std::function<Result(std::unique_ptr<InputStreamType>)>;
 
@@ -53,16 +55,25 @@ public:
   auto operator>>=(std::function<Parser<S, U>(T)> &f) -> Parser<S, U> {
     return then(std::forward(f));
   }
+
+  template <typename U> auto empty() -> Parser<S, Parser::Error> {
+    return Parser([](auto stream) { return Parser::Error(nullptr, "empty"); });
+  }
+
+  auto option(Parser &) -> Parser;
 };
 
 template <typename S, typename T>
 template <typename U>
 auto Parser<S, T>::map(std::function<U(T)> &&f) -> Parser<S, U> {
+
   return Parser<S, U>([=](auto stream) {
     // all stream will be moved. The next state can be get from
     // the returned Result type.
+
     auto result = run_parser(std::move(stream));
     auto [stream1, val1] = std::move(std::get<Ok>(result));
+
     return typename Parser<S, U>::Ok{std::move(stream1), f(val1)};
   });
 }
@@ -70,6 +81,7 @@ auto Parser<S, T>::map(std::function<U(T)> &&f) -> Parser<S, U> {
 template <typename S, typename T>
 template <typename U>
 auto Parser<S, T>::pure(U v) -> Parser<S, U> {
+
   return Parser<S, U>([=](auto stream) {
     return typename Parser<S, U>::Ok{std::move(stream), v};
   });
@@ -78,6 +90,7 @@ auto Parser<S, T>::pure(U v) -> Parser<S, U> {
 template <typename S, typename T>
 template <typename U>
 auto Parser<S, T>::ap(Parser<S, std::function<U(T)>> &fa) -> Parser<S, U> {
+
   return Parser<S, U>([=](auto stream) {
     // run fa to get the function.
     auto fa_result = fa.run_parser(std::move(stream));
@@ -85,6 +98,7 @@ auto Parser<S, T>::ap(Parser<S, std::function<U(T)>> &fa) -> Parser<S, U> {
 
     // apply function to the result of run_parser.
     auto [stream2, result] = run_parser(std::move(stream1));
+
     return typename Parser<S, U>::Ok(std::move(stream2), f(result));
   });
 }
@@ -107,11 +121,26 @@ auto Parser<S, T>::then(std::function<Parser<S, U>(T)> &fma) -> Parser<S, U> {
   });
 }
 
-template <typename T> using SP = Parser<stream::StringStream, T>;
+template <typename S, typename T>
+auto Parser<S, T>::option(Parser<S, T> &other) -> Parser<S, T> {
+  return Parser<S, T>([=](auto stream) {
+    auto result = run_parser(std::move(stream));
+    auto [stream1, _] = result;
 
-// template <typename S, T>
-// template <typename U>
-// auto Parser<S, T>::in
+    // success on the first
+    if (auto ptr = std::get_if<Parser<S, T>::Ok>(&result)) {
+      return result;
+    }
+
+    // failed
+    if (auto ptr = std::get_if<Parser<S, T>::Error>(&result)) {
+      auto result1 = other.run_parser(std::move(stream1));
+      return result1;
+    }
+  });
+}
+
+template <typename T> using SP = Parser<stream::StringStream, T>;
 
 } // namespace cppparsec
 #endif /* ifndef CPPPARSEC_COMBINATOR_ */
