@@ -14,15 +14,15 @@ namespace cppparsec {
 template <typename S, typename T> class Parser {
 public:
   using InputStreamType = S;
-  using InputStreamPtr = std::unique_ptr<InputStreamType>;
+  using InputStream = std::unique_ptr<InputStreamType>;
 
   struct Ok {
-    InputStreamPtr stream; // always move.
+    InputStream stream; // always move.
     T val;
   };
 
   struct Error {
-    InputStreamPtr stream; // always move.
+    InputStream stream; // always move.
     const std::string_view error_message;
   };
 
@@ -32,7 +32,7 @@ public:
   // Either case you hae access to the updated stream.
   using Result = std::variant<Ok, Error>;
 
-  using RunParserFnType = std::function<Result(InputStreamPtr)>;
+  using RunParserFnType = std::function<Result(InputStream)>;
 
   RunParserFnType run_parser;
 
@@ -43,16 +43,16 @@ public:
   Parser(const Parser &) = delete;
   Parser &operator=(const Parser &) = delete;
 
-  Parser(RunParserFnType &&f) : run_parser(f){};
+  Parser(const RunParserFnType &f) : run_parser(f){};
 
   template <typename U> auto map(std::function<U(T)> &&f) -> Parser<S, U>;
 
   template <typename U> static auto pure(U) -> Parser<S, U>;
   template <typename U>
-  auto ap(Parser<S, std::function<U(T)>> &fa) -> Parser<S, U>;
+  auto ap(const Parser<S, std::function<U(T)>> &fa) -> Parser<S, U>;
 
   template <typename U>
-  auto then(std::function<Parser<S, U>(T)> &f) -> Parser<S, U>;
+  auto then(const std::function<Parser<S, U>(T)> &f) -> Parser<S, U>;
   template <typename U>
   auto operator>>=(std::function<Parser<S, U>(T)> &f) -> Parser<S, U> {
     return then(std::forward(f));
@@ -62,7 +62,7 @@ public:
     return Parser([](auto stream) { return Parser::Error(nullptr, "empty"); });
   }
 
-  auto option(Parser &) -> Parser;
+  auto option(const Parser &) -> Parser;
 };
 
 template <typename S, typename T>
@@ -100,7 +100,8 @@ auto Parser<S, T>::pure(U v) -> Parser<S, U> {
 
 template <typename S, typename T>
 template <typename U>
-auto Parser<S, T>::ap(Parser<S, std::function<U(T)>> &fa) -> Parser<S, U> {
+auto Parser<S, T>::ap(const Parser<S, std::function<U(T)>> &fa)
+    -> Parser<S, U> {
   using P = Parser<S, U>;
 
   return P([=](auto stream) -> typename Parser<S, U>::Result {
@@ -128,7 +129,8 @@ auto Parser<S, T>::ap(Parser<S, std::function<U(T)>> &fa) -> Parser<S, U> {
 // Monad bind
 template <typename S, typename T>
 template <typename U>
-auto Parser<S, T>::then(std::function<Parser<S, U>(T)> &fma) -> Parser<S, U> {
+auto Parser<S, T>::then(const std::function<Parser<S, U>(T)> &fma)
+    -> Parser<S, U> {
   using P = Parser<S, U>;
 
   return P([=](auto stream) -> typename Parser<S, U>::Result {
@@ -153,7 +155,7 @@ auto Parser<S, T>::then(std::function<Parser<S, U>(T)> &fma) -> Parser<S, U> {
 }
 
 template <typename S, typename T>
-auto Parser<S, T>::option(Parser<S, T> &other) -> Parser<S, T> {
+auto Parser<S, T>::option(const Parser<S, T> &other) -> Parser<S, T> {
   return Parser<S, T>([=](auto stream) {
     auto result = run_parser(std::move(stream));
 
