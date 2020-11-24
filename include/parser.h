@@ -5,16 +5,27 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
+#include <type_traits>
 #include <variant>
 
 namespace cppparsec {
 
+enum class PError {
+  ErrorEOF,
+  EOFInput,
+  Unexpected,
+};
+
 // Monadic parser combinator
 template <typename S, typename T> class Parser {
+
 public:
   using InputStreamType = S;
-  using InputStream = std::unique_ptr<InputStreamType>;
+  using InputStream =
+      std::enable_if_t<stream::is_stream<InputStreamType>::value,
+                       std::unique_ptr<InputStreamType>>;
 
   struct Ok {
     InputStream stream; // always move.
@@ -70,7 +81,7 @@ template <typename U>
 auto Parser<S, T>::map(std::function<U(T)> &&f) -> Parser<S, U> {
   using P = Parser<S, U>;
 
-  return P([=](auto stream) -> typename Parser<S, U>::Result {
+  return P([=](auto stream) -> typename P::Result {
     // all stream will be moved. The next state can be get from
     // the returned Result type.
 
@@ -93,7 +104,7 @@ template <typename U>
 auto Parser<S, T>::pure(U v) -> Parser<S, U> {
   using P = Parser<S, U>;
 
-  return P([=](auto stream) -> typename Parser<S, U>::Result {
+  return P([=](auto stream) -> typename P::Result {
     return typename P::Ok{std::move(stream), v};
   });
 }
@@ -104,7 +115,7 @@ auto Parser<S, T>::ap(const Parser<S, std::function<U(T)>> &fa)
     -> Parser<S, U> {
   using P = Parser<S, U>;
 
-  return P([=](auto stream) -> typename Parser<S, U>::Result {
+  return P([=](auto stream) -> typename P::Result {
     // run fa to get the function.
     auto fa_result = fa.run_parser(std::move(stream));
 
@@ -133,9 +144,10 @@ auto Parser<S, T>::then(const std::function<Parser<S, U>(T)> &fma)
     -> Parser<S, U> {
   using P = Parser<S, U>;
 
-  return P([=](auto stream) -> typename Parser<S, U>::Result {
+  return P([=](auto stream) -> typename P::Result {
     // run self
     auto result = run_parser(std::move(stream));
+
     if (std::holds_alternative<Ok>(result)) {
       auto [stream1, v1] = std::move(std::get<Ok>(result));
 
@@ -156,7 +168,8 @@ auto Parser<S, T>::then(const std::function<Parser<S, U>(T)> &fma)
 
 template <typename S, typename T>
 auto Parser<S, T>::option(const Parser<S, T> &other) -> Parser<S, T> {
-  return Parser<S, T>([=](auto stream) {
+
+  return Parser<S, T>([=](auto stream) -> Parser<S, T>::Result {
     auto result = run_parser(std::move(stream));
 
     auto [stream1, _] = result;
