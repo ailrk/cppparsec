@@ -10,19 +10,19 @@
 
 namespace cppparsec {
 
-
 // Monadic parser combinator
 template <typename S, typename T> class Parser {
 public:
   using InputStreamType = S;
+  using InputStreamPtr = std::unique_ptr<InputStreamType>;
 
   struct Ok {
-    std::unique_ptr<InputStreamType> stream; // always move.
+    InputStreamPtr stream; // always move.
     T val;
   };
 
   struct Error {
-    std::unique_ptr<InputStreamType> stream; // always move.
+    InputStreamPtr stream; // always move.
     const std::string_view error_message;
   };
 
@@ -32,8 +32,7 @@ public:
   // Either case you hae access to the updated stream.
   using Result = std::variant<Ok, Error>;
 
-  using RunParserFnType =
-      std::function<Result(std::unique_ptr<InputStreamType>)>;
+  using RunParserFnType = std::function<Result(InputStreamPtr)>;
 
   RunParserFnType run_parser;
 
@@ -157,6 +156,7 @@ template <typename S, typename T>
 auto Parser<S, T>::option(Parser<S, T> &other) -> Parser<S, T> {
   return Parser<S, T>([=](auto stream) {
     auto result = run_parser(std::move(stream));
+
     auto [stream1, _] = result;
 
     // success on the first

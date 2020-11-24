@@ -26,7 +26,7 @@ void test_stream() {
 
     std::cout << "After eat, line:" << stream1->get_line()
               << ", col:" << stream1->get_col() << std::endl;
-    std::cout << stream1->peek_stream()->at(0) << std::endl;
+    std::cout << stream1->peek_stream().at(0) << std::endl;
 
     assert(stream1->get_line() == 2);
     assert(stream1->get_col() == 1);
@@ -129,7 +129,8 @@ void test_parser_comb3() {
 }
 
 // test alternative
-void test_parser_comb4() {}
+void test_parser_comb4() {
+}
 
 int main(void) {
   sep();

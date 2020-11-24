@@ -22,9 +22,10 @@ public:
   Stream(const Stream &) = delete;
   Stream &operator=(const Stream &) = delete;
 
+  virtual bool is_empty() const = 0;
   virtual size_t get_line() const = 0;
   virtual size_t get_col() const = 0;
-  virtual const T *peek_stream() const = 0;
+  virtual const T &peek_stream() const = 0;
   virtual std::unique_ptr<Stream<T>> eat(size_t n) const = 0;
 };
 
@@ -39,11 +40,10 @@ public:
   StringStream(const std::string_view &s, const Position &pos)
       : data(s), position(pos) {}
 
+  bool is_empty() const override { return data.size() == 0; }
   size_t get_line() const override { return position.line; };
   size_t get_col() const override { return position.col; };
-  virtual const std::string_view *peek_stream() const override {
-    return &data;
-  };
+  virtual const std::string_view &peek_stream() const override { return data; };
 
   std::unique_ptr<Stream<StreamItemType>> eat(size_t n) const override {
     return std::make_unique<StringStream>(data.substr(n), [=]() {

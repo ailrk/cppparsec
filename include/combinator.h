@@ -3,6 +3,7 @@
 
 #include "parser.h"
 #include <functional>
+#include <stdlib.h>
 #include <string>
 #include <vector>
 
@@ -10,28 +11,47 @@ namespace cppparsec {
 
 // defines some useful character parsers for SP<T>.
 // these combinators currently only support ascii.
-// namespace chars {
+namespace chars {
 
 //// success as long as the input is not empty.
-// auto item(char) -> SP<char>;
+auto item(char c) -> SP<char> {
+  return SP<char>([](SP<char>::InputStreamPtr stream) -> SP<char>::Result {
+    if (stream->is_empty()) {
+      return SP<char>::Error{std::move(stream), "EOF"};
+    }
+    char e = stream->peek_stream().at(0);
 
-////
-// template <typename T> auto value(T) -> SP<T>;
+    // TODO pass the next stream.
+    auto next_stream = stream->eat(1);
+    return SP<char>::Ok{std::move(stream), e};
+  });
+}
 
-////
-// auto satisfy(std::function<bool(char)>) -> SP<char>;
+// parse the character that satisfy the predicate.
+auto satisfy(std::function<bool(char)> &pred) -> SP<char> {
+  return SP<char>([=](SP<char>::InputStreamPtr stream) -> SP<char>::Result {
+    char e = stream->peek_stream().at(0);
+    if (pred(e)) {
 
-////
-// auto ch(char) -> SP<char>;
+      return SP<char>::Ok{std::move(stream), e};
+    };
+    // TODO pass the next stream.
+    return SP<char>::Error{std::move(stream), "wrong"};
+  });
+}
 
-////
-// auto digit = SP<char>([](auto stream) {
-//  // TODO
-//});
+//
+auto ch(char c) -> SP<char> {
+  std::function<bool(char)> pred = [=](char c1) { return c == c1; };
+  return satisfy(pred);
+}
+
+//
+auto digit = satisfy(static_cast<std::function<bool(char)>>(isdigit));
 
 // auto space = SP<char>([](auto stream) {
-//  // TODO
-//});
+//   // TODO
+// });
 
 //// consume one char, parse it as long as it is one of the element in the
 /// vector.
@@ -63,7 +83,7 @@ namespace cppparsec {
 //  // TODO
 //});
 
-//} // namespace chars
+} // namespace chars
 
 // generic combinators
 namespace comb {
