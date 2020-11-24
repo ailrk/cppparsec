@@ -2,6 +2,7 @@
 #define CPPPARSEC_COMBINATOR_
 
 #include "parser.h"
+#include <algorithm>
 #include <functional>
 #include <stdlib.h>
 #include <string>
@@ -47,19 +48,23 @@ auto ch(char c) -> SP<char> {
 }
 
 //
-auto digit = satisfy(static_cast<std::function<bool(char)>>(isdigit));
+std::function<bool(char)> isdigit_ = isdigit;
+auto digit = satisfy(isdigit_);
 
-// auto space = SP<char>([](auto stream) {
-//   // TODO
-// });
+std::function<bool(char)> isspace_ = isspace;
+auto space = satisfy(isspace_);
 
-//// consume one char, parse it as long as it is one of the element in the
-/// vector.
-// auto oneOf(std::vector<char>) -> SP<char> {
-//  return SP<char>([](auto stream) {
-//    // TODO
-//  });
-//}
+// consume one char, parse it as long as it is one of the element in the
+// vector.
+auto oneOf(std::vector<char> ps) -> SP<char> {
+  return SP<char>([=](SP<char>::InputStreamPtr stream) -> SP<char>::Result {
+    char e = stream->peek_stream().at(0);
+    if (std::find(ps.begin(), ps.end(), e) != ps.end()) {
+      return SP<char>::Ok{std::move(stream), e};
+    }
+    return SP<char>::Error{std::move(stream), "not matched"};
+  });
+}
 
 //// parse 0 or more a sequence of space characters.
 // auto spaces = SP<std::vector<char>>{
