@@ -34,7 +34,7 @@ namespace cppparsec {
 //});
 
 //// consume one char, parse it as long as it is one of the element in the
-///vector.
+/// vector.
 // auto oneOf(std::vector<char>) -> SP<char> {
 //  return SP<char>([](auto stream) {
 //    // TODO

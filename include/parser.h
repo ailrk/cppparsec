@@ -10,6 +10,7 @@
 
 namespace cppparsec {
 
+
 // Monadic parser combinator
 template <typename S, typename T> class Parser {
 public:
@@ -18,17 +19,11 @@ public:
   struct Ok {
     std::unique_ptr<InputStreamType> stream; // always move.
     T val;
-
-    Ok(std::unique_ptr<InputStreamType> &&stream, T val)
-        : stream(std::move(stream)), val(val) {}
   };
 
   struct Error {
     std::unique_ptr<InputStreamType> stream; // always move.
     const std::string_view error_message;
-
-    Error(std::unique_ptr<InputStreamType> &&stream, std::string_view e)
-        : stream(std::move(stream)), error_message(e) {}
   };
 
   // Return type of run_parser.
@@ -44,8 +39,8 @@ public:
 
   Parser() = delete;
 
-  // we don't want to copy parser, because that will copy the internal
-  // state as well.
+  // we don't want to copy parser, because that will copy the
+  // internal state as well.
   Parser(const Parser &) = delete;
   Parser &operator=(const Parser &) = delete;
 
@@ -64,7 +59,7 @@ public:
     return then(std::forward(f));
   }
 
-  template <typename U> auto empty() -> Parser<S, Parser::Error> {
+  static auto empty() -> Parser<S, T> {
     return Parser([](auto stream) { return Parser::Error(nullptr, "empty"); });
   }
 
@@ -74,21 +69,22 @@ public:
 template <typename S, typename T>
 template <typename U>
 auto Parser<S, T>::map(std::function<U(T)> &&f) -> Parser<S, U> {
+  using P = Parser<S, U>;
 
-  return Parser<S, U>([=](auto stream) {
+  return P([=](auto stream) -> typename Parser<S, U>::Result {
     // all stream will be moved. The next state can be get from
     // the returned Result type.
 
     auto result = run_parser(std::move(stream));
-    if (std::get_if<Ok>(&result)) {
+    if (std::holds_alternative<Ok>(result)) {
       auto [stream1, val1] = std::move(std::get<Ok>(result));
-      return typename Parser<S, U>::Ok{std::move(stream1), f(val1)};
-    }
 
-    if (std::get_if<Error>(&result)) {
-      auto [stream1, msg] = std::move(std::get<Error>(result));
-      std::cout << msg << std::endl;
-      return typename Parser<S, U>::Error{std::move(stream1), msg};
+      return typename P::Ok{std::move(stream1), f(val1)};
+
+    } else {
+      auto [stream1, error] = std::move(std::get<Error>(result));
+
+      return typename P::Error{std::move(stream1), error};
     }
   });
 }
@@ -96,32 +92,35 @@ auto Parser<S, T>::map(std::function<U(T)> &&f) -> Parser<S, U> {
 template <typename S, typename T>
 template <typename U>
 auto Parser<S, T>::pure(U v) -> Parser<S, U> {
+  using P = Parser<S, U>;
 
-  return Parser<S, U>([=](auto stream) {
-    return typename Parser<S, U>::Ok{std::move(stream), v};
+  return P([=](auto stream) -> typename Parser<S, U>::Result {
+    return typename P::Ok{std::move(stream), v};
   });
 }
 
 template <typename S, typename T>
 template <typename U>
 auto Parser<S, T>::ap(Parser<S, std::function<U(T)>> &fa) -> Parser<S, U> {
+  using P = Parser<S, U>;
 
-  return Parser<S, U>([=](auto stream) {
+  return P([=](auto stream) -> typename Parser<S, U>::Result {
     // run fa to get the function.
     auto fa_result = fa.run_parser(std::move(stream));
-    if (std::get_if<Ok>(&fa_result)) {
+
+    if (std::holds_alternative<Ok>(fa_result)) {
       auto [stream1, f] = std::move(std::get<decltype(fa)::Ok>(fa_result));
 
       // apply function to the result of run_parser.
       auto [stream2, v1] = run_parser(std::move(stream1));
       auto v2 = f(v1);
 
-      return typename Parser<S, U>::Ok(std::move(stream2), v2);
-    }
+      return typename P::Ok(std::move(stream2), v2);
 
-    if (std::get_if<Error>(&fa_result)) {
+    } else {
       auto error = std::move(std::get<decltype(fa)::Error>(fa_result));
       std::cout << error.error_message << std::endl;
+
       return fa_result;
     }
   });
@@ -131,21 +130,24 @@ auto Parser<S, T>::ap(Parser<S, std::function<U(T)>> &fa) -> Parser<S, U> {
 template <typename S, typename T>
 template <typename U>
 auto Parser<S, T>::then(std::function<Parser<S, U>(T)> &fma) -> Parser<S, U> {
-  return Parser<S, U>([=](auto stream) {
+  using P = Parser<S, U>;
+
+  return P([=](auto stream) -> typename Parser<S, U>::Result {
     // run self
     auto result = run_parser(std::move(stream));
-    if (std::get_if<Ok>(&result)) {
+    if (std::holds_alternative<Ok>(result)) {
       auto [stream1, v1] = std::move(std::get<Ok>(result));
 
       // apply f to get a new parser.
-      Parser<S, U> ma = fma(v1);
+      P ma = fma(v1);
       auto ma_result = ma.run_parser(std::move(stream1));
-      return ma_result;
-    }
 
-    if (std::get_if<Error>(&result)) {
+      return ma_result;
+
+    } else {
       auto error = std::move(std::get<Error>(result));
       std::cout << error.error_message << std::endl;
+
       return error;
     }
   });
@@ -158,12 +160,9 @@ auto Parser<S, T>::option(Parser<S, T> &other) -> Parser<S, T> {
     auto [stream1, _] = result;
 
     // success on the first
-    if (auto ptr = std::get_if<Parser<S, T>::Ok>(&result)) {
+    if (std::holds_alternative<Parser<S, T>::Ok>(result)) {
       return result;
-    }
-
-    // failed
-    if (auto ptr = std::get_if<Parser<S, T>::Error>(&result)) {
+    } else { // failed
       auto result1 = other.run_parser(std::move(stream1));
       return result1;
     }

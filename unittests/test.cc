@@ -103,15 +103,27 @@ void test_parser_comb3() {
   using cppparsec::stream::StringStream;
   using std::function;
 
-  // { // TEST
-  //   auto p = SP<int>::pure(1);
-  //   p.then<int>([](auto v) {
-  //     return SP<int>([](auto stream) {
-  //       return typename SP<int>::Result{std::move(stream), 2};
-  //     });
-  //   });
-  // }
+  auto stream = std::make_unique<StringStream>("abc\ndef\n");
+  auto p = SP<double>::pure(1.0);
 
+  std::function<SP<double>(double)> fma = [](double v) {
+    // selecting monad.
+    if (v > 10) {
+      return SP<double>([](auto s) {
+        return typename SP<double>::Ok{std::move(s), 1};
+      });
+    }
+    return SP<double>([](auto s) {
+      return typename SP<double>::Ok{std::move(s), 10};
+    });
+  };
+
+  {
+    auto v = p.then<double>(fma).run_parser(std::move(stream));
+    std::cout << "then: " << std::get<SP<double>::Ok>(v).val << std::endl;
+  }
+
+  //   p.then<double>([](auto v) -> SP<double> {});
   std::cout << "TEST: " << test_name << " PASS! " << std::endl;
   sep();
 }
@@ -124,5 +136,6 @@ int main(void) {
   test_stream();
   test_parser_comb1();
   test_parser_comb2();
+  test_parser_comb3();
   return 0;
 }
