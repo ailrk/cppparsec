@@ -27,11 +27,13 @@ public:
       std::enable_if_t<stream::is_stream<InputStreamType>::value,
                        std::unique_ptr<InputStreamType>>;
 
+  // Ok takes the onwership of stream
   struct Ok {
     InputStream stream; // always move.
     T val;
   };
 
+  // Error also takes the onwership of stream
   struct Error {
     InputStream stream; // always move.
     const std::string_view error_message;
@@ -40,7 +42,6 @@ public:
   // Return type of run_parser.
   // It can either be Ok indicates parse succeed.
   // or Error indicates parse failed.
-  // Either case you hae access to the updated stream.
   using Result = std::variant<Ok, Error>;
 
   using RunParserFnType = std::function<Result(InputStream)>;
@@ -56,24 +57,34 @@ public:
 
   Parser(const RunParserFnType &f) : run_parser(f){};
 
+  // Declaration for Functor:
   template <typename U> auto map(std::function<U(T)> &&f) -> Parser<S, U>;
 
+  // Declaration for Applicative:
   template <typename U> static auto pure(U) -> Parser<S, U>;
   template <typename U>
   auto ap(const Parser<S, std::function<U(T)>> &fa) -> Parser<S, U>;
 
+  // Declarations for monad:
   template <typename U>
   auto then(const std::function<Parser<S, U>(T)> &f) -> Parser<S, U>;
+
+  // short hand for monadic bind.
   template <typename U>
   auto operator>>=(std::function<Parser<S, U>(T)> &f) -> Parser<S, U> {
     return then(std::forward(f));
   }
 
+  // Declarations for Alternatives:
+  // identity of alternative.
   static auto empty() -> Parser<S, T> {
     return Parser([](auto stream) { return Parser::Error(nullptr, "empty"); });
   }
 
   auto option(const Parser &) -> Parser;
+
+  // short hand for alternative.
+  auto operator|(const Parser &p) -> Parser { return option(p); }
 };
 
 template <typename S, typename T>

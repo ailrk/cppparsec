@@ -10,116 +10,39 @@
 
 namespace cppparsec {
 
-// defines some useful character parsers for SP<T>.
-// these combinators currently only support ascii.
-namespace chars {
-
-//// success as long as the input is not empty.
-auto item(char c) -> SP<char> {
-  using InputStream = SP<char>::InputStream;
-  using Result = SP<char>::Result;
-
-  return SP<char>([](InputStream stream) -> Result {
-    if (stream->is_empty()) {
-      return SP<char>::Error{std::move(stream), "EOF"};
-    }
-    char e = stream->peek_stream().at(0);
-
-    // TODO pass the next stream.
-    auto next_stream = stream->eat(1);
-    return SP<char>::Ok{std::move(stream), e};
-  });
-}
-
-// parse the character that satisfy the predicate.
-auto satisfy(const std::function<bool(char)> &pred) -> SP<char> {
-  using InputStream = SP<char>::InputStream;
-  using Result = SP<char>::Result;
-
-  return SP<char>([=](InputStream stream) -> Result {
-    char e = stream->peek_stream().at(0);
-    if (pred(e)) {
-
-      return SP<char>::Ok{std::move(stream), e};
-    };
-    // TODO pass the next stream.
-    return SP<char>::Error{std::move(stream), "wrong"};
-  });
-}
-
-//
-auto ch(char c) -> SP<char> {
-  return satisfy([=](char c1) { return c == c1; });
-}
-
-auto digit = satisfy(isdigit);
-
-auto space = satisfy(isspace);
-
-// consume one char, parse it as long as it is one of the element in the
-// vector.
-auto oneOf(std::vector<char> ps) -> SP<char> {
-  using InputStream = SP<char>::InputStream;
-  using Result = SP<char>::Result;
-
-  return SP<char>([=](InputStream stream) -> Result {
-    char e = stream->peek_stream().at(0);
-    if (std::find(ps.begin(), ps.end(), e) != ps.end()) {
-      return SP<char>::Ok{std::move(stream), e};
-    }
-    return SP<char>::Error{std::move(stream), "not matched"};
-  });
-}
-
-//// parse 0 or more a sequence of space characters.
-// auto spaces = SP<std::vector<char>>{
-//    // TODO
-//};
-
-//// parse 1 or more sequences of space characters.
-// auto spaces = SP<std::vector<char>>{
-//    // TODO
-//};
-
-// auto lower = SP<char>([](auto stream) {
-//  // TODO
-//});
-
-// auto upper = SP<char>([](auto stream) {
-//  // TODO
-//});
-
-// auto alpha = SP<char>([](auto stream) {
-//  // TODO
-//});
-
-} // namespace chars
-
 // generic combinators
 namespace comb {
 
 // zero or more
 template <typename S, typename T>
-auto some(const Parser<S, T> &p) -> Parser<S, std::vector<T>> {
+auto some(const Parser<S, T> &v) -> Parser<S, std::vector<T>> {
   using InputStream = typename Parser<S, T>::InputStream;
   using Result = typename Parser<S, T>::Result;
 
-  return Parser<S, T>([=](InputStream stream) -> Result {
-    // try first.
-    auto result1 = p.run_parser(std::move(stream));
+  Parser<S, std::vector<T>> many_v;
+  Parser<S, std::vector<T>> some_v;
 
-    if (std::holds_alternative<Parser<S, T>::Ok>) {
-      // repeat
-      // TODO
-    } else {
-      return typename Parser<S, T>::Error{std::move(stream), "not match"};
-    }
-  });
+  many_v = some_v.option( // many_v = some_v <|> pure []
+      Parser<S, std::vector<T>>::pure(std::vector<T>()));
+
+  // TODO some_v
+  return some_v;
 }
 
 // one or more
 template <typename S, typename T>
-auto many(const Parser<S, T> &p) -> Parser<S, std::vector<T>>;
+auto many(const Parser<S, T> &v) -> Parser<S, std::vector<T>> {
+  using InputStream = typename Parser<S, T>::InputStream;
+  using Result = typename Parser<S, T>::Result;
+
+  Parser<S, std::vector<T>> many_v;
+  Parser<S, std::vector<T>> some_v;
+
+  many_v = some_v.option( // many_v = some_v <|> pure []
+      Parser<S, std::vector<T>>::pure(std::vector<T>()));
+  // TODO some_v
+  return many_v;
+}
 
 // skip zero or more
 template <typename S, typename T>
@@ -158,6 +81,82 @@ template <typename S, typename Sep, typename T>
 auto sep_by1(const Parser<S, T> &p, const Parser<S, Sep> &sep) -> Parser<S, T>;
 
 } // namespace comb
+
+// defines some useful character parsers for SP<T>.
+// these combinators currently only support ascii.
+namespace chars {
+
+//// success as long as the input is not empty.
+auto item(char c) -> SP<char> {
+  using InputStream = SP<char>::InputStream;
+  using Result = SP<char>::Result;
+
+  return SP<char>([](InputStream stream) -> Result {
+    if (stream->is_empty()) {
+      return SP<char>::Error{std::move(stream), "EOF"};
+    }
+    char e = stream->peek_stream().at(0);
+
+    auto next_stream = stream->eat();
+    return SP<char>::Ok{std::move(stream), e};
+  });
+}
+
+// parse the character that satisfy the predicate.
+auto satisfy(const std::function<bool(char)> &pred) -> SP<char> {
+  using InputStream = SP<char>::InputStream;
+  using Result = SP<char>::Result;
+
+  return SP<char>([=](InputStream stream) -> Result {
+    char e = stream->peek_stream().at(0);
+    auto next_stream = stream->eat();
+    if (pred(e)) {
+      return SP<char>::Ok{std::move(next_stream), e};
+    };
+    return SP<char>::Error{std::move(next_stream), "wrong"};
+  });
+}
+
+// match for the given character.
+auto ch(char c) -> SP<char> {
+  return satisfy([=](char c1) { return c == c1; });
+}
+
+auto digit = satisfy(isdigit);
+
+auto letter = satisfy(isalpha);
+
+auto alnum = satisfy(isalnum);
+
+auto upper = satisfy(isupper);
+
+auto lower = satisfy(islower);
+
+auto punctuation = satisfy(ispunct);
+
+auto space = satisfy(isspace);
+
+// consume one char, parse it as long as it is one of the
+// element in the vector.
+auto oneOf = [](const std::vector<char> &ps) {
+  return satisfy([=](char c) -> bool {
+    return std::find(ps.cbegin(), ps.cend(), c) != ps.cend();
+  });
+};
+
+// parse 0 or more a sequence of space characters.
+auto spaces = comb::many(space);
+
+// parse 1 or more sequences of space characters.
+auto spaces1 = comb::some(space);
+
+// parse a letter and convert it to lower case
+auto to_lower = letter.map<char>([](char c) { return tolower(c); });
+
+auto to_upper = letter.map<char>([](char c) { return toupper(c); });
+
+} // namespace chars
+  // namespace comb
 
 } // namespace cppparsec
 

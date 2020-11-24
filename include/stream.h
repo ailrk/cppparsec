@@ -30,7 +30,7 @@ struct has_stream_impl {
 template <typename T>
 struct is_stream : decltype(has_stream_impl::test<T>(0)) {};
 
-template <typename T> class Stream {
+template <typename T, typename Self> class Stream {
 public:
   using StreamItemType = T;
   virtual ~Stream() = default;
@@ -43,27 +43,32 @@ public:
   virtual size_t get_line() const = 0;
   virtual size_t get_col() const = 0;
   virtual const T &peek_stream() const = 0;
-  virtual std::unique_ptr<Stream<T>> eat(size_t n) const = 0;
-  virtual std::unique_ptr<Stream<T>> eat() const = 0;
+
+  // need F bound polymorphism to return derived class.
+  virtual std::unique_ptr<Self> eat(size_t n) const = 0;
+  virtual std::unique_ptr<Self> eat() const = 0;
 };
 
-class StringStream : public Stream<std::string_view> {
+class StringStream : public Stream<std::string_view, StringStream> {
 
 private:
   std::string_view data;
   mutable Position position;
 
-public:
-  StringStream(std::string_view s) : data(s), position(Position{1, 1}) {}
+  // update stream, return a new String Stream.
+  // note because it just pass a string view, copy cost almost nothing.
   StringStream(const std::string_view &s, const Position &pos)
       : data(s), position(pos) {}
+
+public:
+  StringStream(std::string_view s) : data(s), position(Position{1, 1}) {}
 
   bool is_empty() const override { return data.size() == 0; }
   size_t get_line() const override { return position.line; };
   size_t get_col() const override { return position.col; };
   virtual const std::string_view &peek_stream() const override { return data; };
 
-  std::unique_ptr<Stream<StreamItemType>> eat(size_t n) const override {
+  std::unique_ptr<StringStream> eat(size_t n) const override {
     return std::make_unique<StringStream>(data.substr(n), [=]() {
       assert(data.size() >= n);
       Position new_position = position;
@@ -80,9 +85,7 @@ public:
     }());
   };
 
-  std::unique_ptr<Stream<StreamItemType>> eat() const override {
-    return eat(1);
-  }
+  std::unique_ptr<StringStream> eat() const override { return eat(1); }
 };
 
 } // namespace stream
