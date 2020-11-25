@@ -17,5 +17,3 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 if(FUZZER)
   add_subdirectory(fuzzer)
 endif()
-
-add_subdirectory(unittests)

@@ -12,83 +12,68 @@
 
 namespace cppparsec {
 
-namespace helper {
-
-/*
- * lifeA2 :: (a -> b -> c) -> f a -> f b -> f c
- * liftA2 f x = (<*>) (fmap f x)
- * */
-template <typename S, typename T, typename U, typename Q,
-          typename Fn = std::function<Q(T, U)>,
-          typename Fn1 = std::function<Q(U)>>
-auto lift_a2(const Fn &f, const Parser<S, T> &p1, const Parser<S, U> &p2)
-    -> Parser<S, Q> {
-
-  const auto tuq = [=](T t) -> Fn1 {
-    return [=](U u) { // q -> u
-      return f(t, u);
-    };
-  };
-}
-
-} // namespace helper
-
 // generic combinators
 namespace comb {
+
+// try a parser. if failed and consumed token, rewind back as it
+// haven't consume
+// This is the only case you want to copy the stream.
+template <typename S, typename T>
+auto attempt(const Parser<S, T> &p) -> Parser<S, T> {
+  using P = Parser<S, T>;
+  return P([=](typename P::InputStream stream) -> typename P::Result {
+    // copy the underlying stream
+    auto prev_stream = std::make_unique<typename P::InputStreamType>(
+        *stream); // copy the current stream.
+    auto result = p.run_parser(std::move(stream));
+
+    // if success, just forward.
+    if (std::holds_alternative<typename P::Ok>(result)) {
+      return result;
+    } else {
+      // if failed, return an error with the old stream.
+      return typename P::Error{std::move(prev_stream), "attempted"};
+    }
+  });
+}
 
 // zero or more
 template <typename S, typename T>
 auto some(Parser<S, T> &v) -> Parser<S, std::deque<T>> {
+  using PFrom = Parser<S, T>;
+  using PTo = Parser<S, std::deque<T>>;
   using InputStream = typename Parser<S, T>::InputStream;
 
-  std::optional<Parser<S, std::deque<T>>> many_v;
-  std::optional<Parser<S, std::deque<T>>> some_v;
+  return PTo([=](InputStream stream) -> typename PTo::Result {
+    std::deque<T> acc{};
+    decltype(stream) next_stream;
 
-  auto empty = []() -> Parser<S, std::deque<T>> {
-    return Parser<S, std::deque<T>>::pure(std::deque<T>());
-  };
+    do {
+      // parse once first.
+      auto result = v.run_parser(std::move(stream));
 
-  // many_v = some_v <|> pure []
-  many_v.emplace(some_v.value().option(empty()));
+      // parse end.
+      if (std::holds_alternative<typename PFrom::Error>(result)) {
 
-  // liftA2 (:) v many_v
-  some_v.emplace(helper::lift_a2<S, T, std::deque<T>, std::deque<T>>(
-      // move the previous deque directly, no copy.
-      [](T val, auto &&d) {
-        d.push_front(val);
-        return d;
-      },
-      v, many_v.value()));
+        auto [stream1, _] = std::move(std::get<typename PFrom::Error>(result));
+        next_stream = std::move(stream1);
+        break;
 
-  return std::move(some_v.value());
+      } else {
+
+        auto [stream1, v] = std::move(std::get<typename PFrom::Ok>(result));
+        next_stream = std::move(stream1);
+        acc.push_back(std::move(v));
+      }
+    } while (1);
+
+    return typename PTo::Ok{std::move(next_stream), acc};
+  });
 }
 
 // one or more
 template <typename S, typename T>
-auto many(Parser<S, T> &v) -> Parser<S, std::deque<T>> {
-  using InputStream = typename Parser<S, T>::InputStream;
-
-  std::optional<Parser<S, std::deque<T>>> many_v(std::nullopt);
-  std::optional<Parser<S, std::deque<T>>> some_v(std::nullopt);
-
-  auto empty = []() -> Parser<S, std::deque<T>> {
-    return Parser<S, std::deque<T>>::pure(std::deque<T>());
-  };
-
-  // many_v = some_v <|> pure []
-  many_v.emplace(some_v.value().option(empty()));
-
-  // liftA2 (:) v many_v
-  some_v.emplace(helper::lift_a2<S, T, std::deque<T>, std::deque<T>>(
-      // move the previous deque directly, no copy.
-      [](T val, auto &&d) {
-        d.push_front(val);
-        return d;
-      },
-      v, many_v.value()));
-
-  return many_v.value_or(empty());
-}
+auto many(Parser<S, T> &v) -> Parser<S, std::deque<T>> {}
 
 // skip zero or more
 template <typename S, typename T>
@@ -107,11 +92,6 @@ auto token(const Parser<S, T> &p) -> Parser<S, T>;
 // if parse failed, replace the error message to the message provided.
 template <typename S, typename T>
 auto raise(std::string_view msg, const Parser<S, T> &p) -> Parser<S, T>;
-
-// try a parser. if failed and consumed token, rewind back as it haven't consume
-// anyting yet
-template <typename S, typename T>
-auto attempt(const Parser<S, T> &p) -> Parser<S, T>;
 
 template <typename S, typename T>
 auto choice(const std::vector<Parser<S, T>> &ps);
@@ -192,7 +172,7 @@ auto oneOf = [](const std::deque<char> &ps) {
 };
 
 // parse 0 or more a sequence of space characters.
-// auto spaces = comb::many(space);
+auto spaces = comb::many(space);
 
 // parse 1 or more sequences of space characters.
 auto spaces1 = comb::some(space);

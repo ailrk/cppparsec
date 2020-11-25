@@ -70,6 +70,17 @@ public:
 
   StringStream(std::string_view s) : data(s), position(Position{1, 1}) {}
 
+  // copy the string stream with the same state.
+  // Thisis essential for retrying.
+  StringStream(const StringStream &stream)
+      : data(stream.data), position(stream.position) {}
+
+  Stream &operator=(const StringStream &stream) {
+    data = stream.data;
+    position = stream.position;
+    return *this;
+  }
+
   bool is_empty() const override;
   size_t get_line() const override;
   size_t get_col() const override;

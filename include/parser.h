@@ -11,11 +11,49 @@
 #include <variant>
 
 namespace cppparsec {
+using std::function;
 
-enum class PError {
-  ErrorEOF,
-  EOFInput,
-  Unexpected,
+class ParserError {
+private:
+  enum class E {
+    ErrorEOF,
+    EOFInput,
+    Unexpected,
+    Try, // Try should not be regard as an error.
+  };
+
+  E type;
+  std::string_view message;
+
+public:
+  using Type = E;
+
+  ParserError(Type type, std::string_view msg) : type(type), message(msg) {}
+
+  std::string to_string() {
+    std::ostringstream os;
+    switch (type) {
+    case E::ErrorEOF:
+      os << "Error EOF: ";
+      break;
+    case E::EOFInput:
+      os << "EOF Input: ";
+      break;
+    case E::Unexpected:
+      os << "Unexpected: ";
+      break;
+
+    // if a parser receive a try error,
+    // it should understand there is an
+    // failed attempt and keep going.
+    case E::Try:
+      os << "Try: ";
+      break;
+    }
+    os << message;
+
+    return os.str();
+  }
 };
 
 /*
@@ -29,13 +67,13 @@ public:
       std::enable_if_t<stream::is_stream<InputStreamType>::value,
                        std::unique_ptr<InputStreamType>>;
 
-  // Ok takes the onwership of stream
+  // Ok takes the onwership of the stream
   struct Ok {
     InputStream stream; // always move.
     T val;
   };
 
-  // Error also takes the onwership of stream
+  // Error also takes the onwership of the stream
   struct Error {
     InputStream stream; // always move.
     const std::string_view error_message;
@@ -60,17 +98,15 @@ public:
   Parser(const RunParserFnType &f) : run_parser(f){};
 
   // Declaration for Functor:
-  template <typename U> using MapTo = std::function<U(T)>;
-  template <typename U> auto map(const MapTo<U> &f) -> Parser<S, U>;
+  template <typename U> auto map(const function<U(T)> &f) -> Parser<S, U>;
 
   // Declaration for Applicative:
   template <typename U> static auto pure(U) -> Parser<S, U>;
 
-  template <typename U> using ApTo = Parser<S, std::function<U(T)>>;
-  template <typename U> auto ap(const ApTo<U> &fa) -> Parser<S, U>;
+  template <typename U> auto ap(const function<U(T)> &fa) -> Parser<S, U>;
 
-  template <typename U> using BindTo = std::function<Parser<S, U>(T)>;
-  template <typename U> auto then(const BindTo<U> &f) -> Parser<S, U>;
+  template <typename U>
+  auto then(const function<Parser<S, U>(T)> &f) -> Parser<S, U>;
 
   // short hand for monadic bind.
   template <typename U>
@@ -100,7 +136,7 @@ private:
 
 template <typename S, typename T>
 template <typename U>
-auto Parser<S, T>::map(const Parser<S, T>::MapTo<U> &f) -> Parser<S, U> {
+auto Parser<S, T>::map(const function<U(T)> &f) -> Parser<S, U> {
   using P = Parser<S, U>;
 
   return P([=](auto stream) -> typename P::Result {
@@ -133,7 +169,7 @@ auto Parser<S, T>::pure(U v) -> Parser<S, U> {
 
 template <typename S, typename T>
 template <typename U>
-auto Parser<S, T>::ap(const Parser<S, T>::ApTo<U> &fa) -> Parser<S, U> {
+auto Parser<S, T>::ap(const function<U(T)> &fa) -> Parser<S, U> {
   using P = Parser<S, U>;
 
   return P([=](auto stream) -> typename P::Result {
@@ -161,13 +197,14 @@ auto Parser<S, T>::ap(const Parser<S, T>::ApTo<U> &fa) -> Parser<S, U> {
 // Monad bind
 template <typename S, typename T>
 template <typename U>
-auto Parser<S, T>::then(const Parser<S, T>::BindTo<U> &fma) -> Parser<S, U> {
+auto Parser<S, T>::then(const function<Parser<S, U>(T)> &fma) -> Parser<S, U> {
   using P = Parser<S, U>;
 
   return P([=](auto stream) -> typename P::Result {
     Result result = run_parser(std::move(stream)); // run self
 
     if (std::holds_alternative<Ok>(result)) {
+
       auto &[stream1, v1] = std::get<Ok>(result);
 
       P ma = fma(v1); // apply f to get a new parser.
