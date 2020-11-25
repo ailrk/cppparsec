@@ -46,7 +46,7 @@ void test_parser_comb1() {
   auto stream = std::make_unique<StringStream>("abc\ndef\n");
   auto p = SP<int>([](auto stream) {
              return SP<int>::Ok{std::move(stream), 1};
-           }).map<double>([](auto v) { return v + 1.2; });
+           }).map<double>([](auto v) { return (double)v + 1.2; });
 
   { // TEST
     auto v = p.run_parser(std::move(stream));

@@ -4,5 +4,4 @@
 #include "combinator.h"
 #include "parser.h"
 
-
 #endif /* ifndef CPPPARSEC_COMBINATOR_ */

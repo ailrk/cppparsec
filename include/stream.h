@@ -27,9 +27,13 @@ struct has_stream_impl {
   static std::true_type test(int);
   template <typename...> static std::false_type test(...);
 };
+
 template <typename T>
 struct is_stream : decltype(has_stream_impl::test<T>(0)) {};
 
+/* Abstract class for stream type. All parser will work on
+ * some types of stream.
+ */
 template <typename T, typename Self> class Stream {
 public:
   using StreamItemType = T;
@@ -49,44 +53,61 @@ public:
   virtual std::unique_ptr<Self> eat() const = 0;
 };
 
+/*
+ * Stream type for string_view.
+ */
 class StringStream : public Stream<std::string_view, StringStream> {
 
 private:
   std::string_view data;
   mutable Position position;
 
+public:
   // update stream, return a new String Stream.
   // note because it just pass a string view, copy cost almost nothing.
   StringStream(const std::string_view &s, const Position &pos)
       : data(s), position(pos) {}
 
-public:
   StringStream(std::string_view s) : data(s), position(Position{1, 1}) {}
 
-  bool is_empty() const override { return data.size() == 0; }
-  size_t get_line() const override { return position.line; };
-  size_t get_col() const override { return position.col; };
-  virtual const std::string_view &peek_stream() const override { return data; };
+  bool is_empty() const override;
+  size_t get_line() const override;
+  size_t get_col() const override;
+  const std::string_view &peek_stream() const override;
 
-  std::unique_ptr<StringStream> eat(size_t n) const override {
-    return std::make_unique<StringStream>(data.substr(n), [=]() {
-      assert(data.size() >= n);
-      Position new_position = position;
-
-      for (int i = 0; i < n; ++i) {
-        if (data[i] == '\n') {
-          new_position.line++;
-          new_position.col = 1;
-        } else {
-          new_position.col++;
-        }
-      }
-      return new_position;
-    }());
-  };
-
-  std::unique_ptr<StringStream> eat() const override { return eat(1); }
+  std::unique_ptr<StringStream> eat(size_t n) const override;
+  std::unique_ptr<StringStream> eat() const override;
 };
+
+bool StringStream::is_empty() const { return data.size() == 0; }
+
+size_t StringStream::get_line() const { return position.line; };
+
+size_t StringStream::get_col() const { return position.col; };
+const std::string_view &StringStream::peek_stream() const { return data; };
+
+/*
+ * Eat the next n tokens, and return a new StringStream with
+ * updated position.
+ */
+std::unique_ptr<StringStream> StringStream::eat(size_t n) const {
+  return std::make_unique<StringStream>(data.substr(n), [=]() {
+    assert(data.size() >= n);
+    Position new_position = position;
+
+    for (int i = 0; i < n; ++i) {
+      if (data[i] == '\n') {
+        new_position.line++;
+        new_position.col = 1;
+      } else {
+        new_position.col++;
+      }
+    }
+    return new_position;
+  }());
+};
+
+std::unique_ptr<StringStream> StringStream::eat() const { return eat(1); }
 
 } // namespace stream
 

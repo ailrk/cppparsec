@@ -3,45 +3,91 @@
 
 #include "parser.h"
 #include <algorithm>
+#include <deque>
 #include <functional>
+#include <optional>
 #include <stdlib.h>
 #include <string>
 #include <vector>
 
 namespace cppparsec {
 
+namespace helper {
+
+/*
+ * lifeA2 :: (a -> b -> c) -> f a -> f b -> f c
+ * liftA2 f x = (<*>) (fmap f x)
+ * */
+template <typename S, typename T, typename U, typename Q,
+          typename Fn = std::function<Q(T, U)>,
+          typename Fn1 = std::function<Q(U)>>
+auto lift_a2(const Fn &f, const Parser<S, T> &p1, const Parser<S, U> &p2)
+    -> Parser<S, Q> {
+
+  const auto tuq = [=](T t) -> Fn1 {
+    return [=](U u) { // q -> u
+      return f(t, u);
+    };
+  };
+}
+
+} // namespace helper
+
 // generic combinators
 namespace comb {
 
 // zero or more
 template <typename S, typename T>
-auto some(const Parser<S, T> &v) -> Parser<S, std::vector<T>> {
+auto some(Parser<S, T> &v) -> Parser<S, std::deque<T>> {
   using InputStream = typename Parser<S, T>::InputStream;
-  using Result = typename Parser<S, T>::Result;
 
-  Parser<S, std::vector<T>> many_v;
-  Parser<S, std::vector<T>> some_v;
+  std::optional<Parser<S, std::deque<T>>> many_v;
+  std::optional<Parser<S, std::deque<T>>> some_v;
 
-  many_v = some_v.option( // many_v = some_v <|> pure []
-      Parser<S, std::vector<T>>::pure(std::vector<T>()));
+  auto empty = []() -> Parser<S, std::deque<T>> {
+    return Parser<S, std::deque<T>>::pure(std::deque<T>());
+  };
 
-  // TODO some_v
-  return some_v;
+  // many_v = some_v <|> pure []
+  many_v.emplace(some_v.value().option(empty()));
+
+  // liftA2 (:) v many_v
+  some_v.emplace(helper::lift_a2<S, T, std::deque<T>, std::deque<T>>(
+      // move the previous deque directly, no copy.
+      [](T val, auto &&d) {
+        d.push_front(val);
+        return d;
+      },
+      v, many_v.value()));
+
+  return std::move(some_v.value());
 }
 
 // one or more
 template <typename S, typename T>
-auto many(const Parser<S, T> &v) -> Parser<S, std::vector<T>> {
+auto many(Parser<S, T> &v) -> Parser<S, std::deque<T>> {
   using InputStream = typename Parser<S, T>::InputStream;
-  using Result = typename Parser<S, T>::Result;
 
-  Parser<S, std::vector<T>> many_v;
-  Parser<S, std::vector<T>> some_v;
+  std::optional<Parser<S, std::deque<T>>> many_v(std::nullopt);
+  std::optional<Parser<S, std::deque<T>>> some_v(std::nullopt);
 
-  many_v = some_v.option( // many_v = some_v <|> pure []
-      Parser<S, std::vector<T>>::pure(std::vector<T>()));
-  // TODO some_v
-  return many_v;
+  auto empty = []() -> Parser<S, std::deque<T>> {
+    return Parser<S, std::deque<T>>::pure(std::deque<T>());
+  };
+
+  // many_v = some_v <|> pure []
+  many_v.emplace(some_v.value().option(empty()));
+
+  // liftA2 (:) v many_v
+  some_v.emplace(helper::lift_a2<S, T, std::deque<T>, std::deque<T>>(
+      // move the previous deque directly, no copy.
+      [](T val, auto &&d) {
+        d.push_front(val);
+        return d;
+      },
+      v, many_v.value()));
+
+  return many_v.value_or(empty());
 }
 
 // skip zero or more
@@ -53,7 +99,7 @@ template <typename S, typename T>
 auto skip_many1(const Parser<S, T> &p) -> Parser<S, void>;
 
 template <typename S, typename T>
-auto repeat(int num, const Parser<S, T> &p) -> Parser<S, std::vector<T>>;
+auto repeat(int num, const Parser<S, T> &p) -> Parser<S, std::deque<T>>;
 
 template <typename S, typename T>
 auto token(const Parser<S, T> &p) -> Parser<S, T>;
@@ -95,8 +141,8 @@ auto item(char c) -> SP<char> {
     if (stream->is_empty()) {
       return SP<char>::Error{std::move(stream), "EOF"};
     }
-    char e = stream->peek_stream().at(0);
 
+    char e = stream->peek_stream().at(0);
     auto next_stream = stream->eat();
     return SP<char>::Ok{std::move(stream), e};
   });
@@ -113,6 +159,7 @@ auto satisfy(const std::function<bool(char)> &pred) -> SP<char> {
     if (pred(e)) {
       return SP<char>::Ok{std::move(next_stream), e};
     };
+
     return SP<char>::Error{std::move(next_stream), "wrong"};
   });
 }
@@ -138,14 +185,14 @@ auto space = satisfy(isspace);
 
 // consume one char, parse it as long as it is one of the
 // element in the vector.
-auto oneOf = [](const std::vector<char> &ps) {
+auto oneOf = [](const std::deque<char> &ps) {
   return satisfy([=](char c) -> bool {
     return std::find(ps.cbegin(), ps.cend(), c) != ps.cend();
   });
 };
 
 // parse 0 or more a sequence of space characters.
-auto spaces = comb::many(space);
+// auto spaces = comb::many(space);
 
 // parse 1 or more sequences of space characters.
 auto spaces1 = comb::some(space);
