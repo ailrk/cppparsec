@@ -93,6 +93,34 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
     REQUIRE(v == 'a');
   }
 
+  SECTION("test functor: compose int -> double -> int -> double") {
+    auto p1 = p.map<int>([](double v) { return v + 1; });
+    auto p2 = p1.map<int>([](double v) { return ((int)v * 100) % 10; });
+    auto p3 = p2.map<double>([](int v) { return v + 1.1; });
+
+    auto v = p3.run(std::move(s));
+    REQUIRE(v == 1.1);
+  }
+
+  SECTION("test functor compose: chain style1") {
+    auto f = [](int v) {
+      raise(SIGINT);
+      return v + 2;
+    };
+
+    auto p1 = p.map<int>(f).map<int>(f);
+    auto v = p1.run(std::move(s));
+    std::cout << v << std::endl;
+  }
+
+  //   SECTION("test functor compose: chain style") {
+  //     auto p1 = p.map<int>([](double v) { return v + 1; })
+  //                   .map<int>([](double v) { return ((int)v * 100) % 10; })
+  //                   .map<double>([](int v) { return v + 1.1; });
+  //     auto v = p1.run(std::move(s));
+  //     std::cout << v << std::endl;
+  //   }
+
   SECTION("test functor: int -> vector<int>") {
     auto p1 = decltype(p)::pure<int>(10).map<std::vector<int>>([](int v) {
       std::vector<int> vec{};
@@ -107,18 +135,6 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
     REQUIRE(v.size() == 10);
   }
 
-  SECTION("test functor: compose int -> double -> int -> double") {
-    auto p1 = p.map<double>([](int v) {
-                 return v + 1.2;
-               }).map<int>([](double v) { return ((int)v * 100) % 10; });
-    // .map<double>([](int v) { return v + 1.1; });
-
-    // auto v = p1.run(std::move(s));
-    auto result = p1.run_parser(std::move(s));
-    auto &[_, v] = std::get<decltype(p1)::Ok>(result);
-    std::cout << v << std::endl;
-  }
-
   SECTION("test ap: pure int") {
     auto p1 = decltype(p)::pure<char>('a');
     auto result = p1.run_parser(std::move(s));
@@ -127,10 +143,32 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
     REQUIRE(v == 'a');
   }
 
-  // SECTION("test ap: simple ap") {
+  SECTION("test ap: simple ap") {
 
-  //   auto p1 = decltype(p)::pure<std::function<char(int)>> {
-  //   }
+    auto p1 = decltype(p)::pure<std::function<double(int)>>(
+        [](int v) { return v + 1.1; });
 
-  // }
+    auto p2 = p.ap(p1);
+    auto v = p2.run(std::move(s));
+    REQUIRE(2.1);
+  }
+
+  SECTION("test ap: multiple") {
+    auto p1 = decltype(p)::pure<std::function<double(int)>>(
+        [](int v) { return v + 1.1; });
+
+    auto p2 = p1 * p;
+    auto v = p2.run(std::move(s));
+    REQUIRE(2.1);
+  }
+
+  SECTION("test then: simple bind") {
+    auto p1 = [](int v) -> P<double> {
+      if (v > 10) {
+        return decltype(p)::pure<double>(11.1);
+      } else {
+        return decltype(p)::pure<double>(1.1);
+      }
+    };
+  }
 }

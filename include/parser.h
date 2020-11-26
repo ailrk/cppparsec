@@ -110,22 +110,11 @@ public:
   // Declaration for Applicative:
   template <typename U> static auto pure(U) -> Parser<S, U>;
 
-  template <typename U> auto ap(const function<U(T)> &fa) -> Parser<S, U>;
+  template <typename U>
+  auto ap(const Parser<S, function<U(T)>> &fa) -> Parser<S, U>;
 
   template <typename U>
   auto then(const function<Parser<S, U>(T)> &f) -> Parser<S, U>;
-
-  // short hand for monadic bind.
-  template <typename U>
-  auto operator>>=(std::function<Parser<S, U>(T)> &f) -> Parser<S, U> {
-    return then(std::forward(f));
-  }
-
-  // >> :: m a -> m b -> m b
-  template <typename U>
-  auto operator>>(const Parser<S, U> &mb) -> Parser<S, U> {
-    return then(std::forward([=](T x) { return mb; }));
-  }
 
   // Declarations for Alternatives:
   // identity of alternative.
@@ -134,9 +123,6 @@ public:
   }
 
   auto option(const Parser &) -> Parser;
-
-  // short hand for alternative.
-  auto operator|(const Parser &p) -> Parser { return option(p); }
 
 private:
 };
@@ -152,11 +138,12 @@ auto Parser<S, T>::map(const function<U(T)> &f) -> Parser<S, U> {
 
     auto result = run_parser(std::move(stream));
 
-    if (std::holds_alternative<Ok>(result)) {
+    try {
+
       auto &[stream1, val1] = std::get<Ok>(result);
       return typename PU::Ok{std::move(stream1), f(val1)};
 
-    } else {
+    } catch (std::bad_variant_access e) {
       auto &[stream1, error] = std::get<Error>(result);
       return typename PU::Error{std::move(stream1), error};
     }
@@ -175,29 +162,38 @@ auto Parser<S, T>::pure(U v) -> Parser<S, U> {
 
 template <typename S, typename T>
 template <typename U>
-auto Parser<S, T>::ap(const function<U(T)> &fa) -> Parser<S, U> {
+auto Parser<S, T>::ap(const Parser<S, function<U(T)>> &fa) -> Parser<S, U> {
   using P = Parser<S, U>;
+  using PFa = Parser<S, function<U(T)>>;
 
   return P([=](auto stream) -> typename P::Result {
     // run fa to get the function.
-    typename decltype(fa)::Result fa_result = fa.run_parser(std::move(stream));
+    //
 
-    if (std::holds_alternative<Ok>(fa_result)) {
-      auto &[stream1, f] = std::get<decltype(fa)::Ok>(fa_result);
+    auto fa_result = fa.run_parser(std::move(stream));
+    try {
+      auto [stream1, f] = std::move(std::get<typename PFa::Ok>(fa_result));
 
       // apply function to the result of run_parser.
-      auto [stream2, v1] = run_parser(std::move(stream1));
-      auto v2 = f(v1);
+      auto result1 = run_parser(std::move(stream1));
+      auto [stream2, v1] = std::move(std::get<Ok>(result1));
+      return typename P::Ok{std::move(stream2), f(v1)};
 
-      return typename P::Ok(std::move(stream2), v2);
+    } catch (std::bad_variant_access err) {
 
-    } else {
-      auto &error = std::get<decltype(fa)::Error>(fa_result);
-      std::cout << error.error_message << std::endl;
+      auto [stream1, e] = std::move(std::get<typename PFa::Error>(fa_result));
 
-      return fa_result;
+      std::cout << e << std::endl;
+      return typename P::Error{std::move(stream1), e};
     }
   });
+} // namespace cppparsec
+
+// fa * p
+template <typename S, typename T, typename U>
+auto operator*(const Parser<S, function<U(T)>> &fa, Parser<S, T> &p)
+    -> Parser<S, U> {
+  return p.ap(fa);
 }
 
 // Monad bind
@@ -228,6 +224,19 @@ auto Parser<S, T>::then(const function<Parser<S, U>(T)> &fma) -> Parser<S, U> {
   });
 }
 
+// short hand for monadic bind.
+template <typename S, typename T, typename U>
+auto operator>>=(Parser<S, T> &p, const std::function<Parser<S, U>(T)> &f)
+    -> Parser<S, U> {
+  return then(std::forward(f));
+}
+
+// >> :: m a -> m b -> m b
+template <typename S, typename T, typename U>
+auto operator>>(Parser<S, T> &p, const Parser<S, U> &mb) -> Parser<S, U> {
+  return p >>= std::forward([=](T x) { return mb; });
+}
+
 template <typename S, typename T>
 auto Parser<S, T>::option(const Parser<S, T> &other) -> Parser<S, T> {
   using P = Parser<S, T>;
@@ -245,6 +254,12 @@ auto Parser<S, T>::option(const Parser<S, T> &other) -> Parser<S, T> {
       return result2;
     }
   });
+}
+
+// short hand for alternative.
+template <typename S, typename T>
+auto operator|(Parser<S, T> &p, const Parser<S, T> &other) -> Parser<S, T> {
+  return p.option(other);
 }
 
 // shorhand for string parser.
