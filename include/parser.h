@@ -97,6 +97,13 @@ public:
 
   Parser(const RunParserFnType &f) : run_parser(f){};
 
+  // short hand for run_parser.
+  T run(InputStream stream) {
+    auto result = run_parser(std::move(stream));
+    auto [_, v] = std::move(std::get<Ok>(result));
+    return v;
+  }
+
   // Declaration for Functor:
   template <typename U> auto map(const function<U(T)> &f) -> Parser<S, U>;
 
@@ -137,9 +144,9 @@ private:
 template <typename S, typename T>
 template <typename U>
 auto Parser<S, T>::map(const function<U(T)> &f) -> Parser<S, U> {
-  using P = Parser<S, U>;
+  using PU = Parser<S, U>;
 
-  return P([=](auto stream) -> typename P::Result {
+  return PU([=](auto stream) -> typename PU::Result {
     // all stream will be moved. The next state can be get from
     // the returned Result type.
 
@@ -147,12 +154,11 @@ auto Parser<S, T>::map(const function<U(T)> &f) -> Parser<S, U> {
 
     if (std::holds_alternative<Ok>(result)) {
       auto &[stream1, val1] = std::get<Ok>(result);
-      U u = f(val1);
-      return typename P::Ok{std::move(stream1), u};
+      return typename PU::Ok{std::move(stream1), f(val1)};
 
     } else {
       auto &[stream1, error] = std::get<Error>(result);
-      return typename P::Error{std::move(stream1), error};
+      return typename PU::Error{std::move(stream1), error};
     }
   });
 }

@@ -63,6 +63,7 @@ _deps
 .clangd/
 .cmake/
 test/external/*
+external/*
 
 .ccls-cache/
 build/
