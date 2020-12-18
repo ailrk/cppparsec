@@ -183,7 +183,6 @@ auto to_lower = letter.map<char>([](char c) { return tolower(c); });
 auto to_upper = letter.map<char>([](char c) { return toupper(c); });
 
 } // namespace chars
-  // namespace comb
 
 } // namespace cppparsec
 

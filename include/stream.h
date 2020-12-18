@@ -58,7 +58,6 @@ public:
  */
 class StringStream : public Stream<std::string_view, StringStream> {
 
-private:
   std::string_view data;
   mutable Position position;
 
