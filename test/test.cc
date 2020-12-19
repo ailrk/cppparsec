@@ -104,8 +104,8 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
 
   SECTION("test functor compose: chain style1") {
     auto f = [](int v) { return v + 2; };
-
     auto v = p.map<int>(f).map<int>(f).map<int>(f).run(std::move(s));
+    REQUIRE(v == 7);
   }
 
   SECTION("test functor compose: chain style2") {
@@ -116,7 +116,7 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
                  return v + 2;
                }).map<int>(f); //.map<int>(f);
     auto v = p1.run(std::move(s));
-    std::cout << v << std::endl;
+    REQUIRE(v == 5);
   }
 
   SECTION("test functor: int -> vector<int>") {
@@ -187,18 +187,18 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
   //   std::cout << v << std::endl;
   // }
 
-  SECTION("test then: simple sequence overload") {
-    auto p1 = p >> (p >> (p >> p));
-    auto v = p1.run(std::move(s));
-    REQUIRE(v == 1);
-  }
+  // SECTION("test then: simple sequence overload") {
+  //   auto p1 = p >> p1;
+  //   auto v = p1.run(std::move(s));
+  //   REQUIRE(v == 1);
+  // }
 
   SECTION("test then: chain then together") {
     auto f1 = [](int v) -> P<double> {
       if (v > 10) {
-        return decltype(p)::pure<double>(11.1);
+        return decltype(p)::pure(11.1);
       } else {
-        return decltype(p)::pure<double>(1.1);
+        return decltype(p)::pure(1.1);
       }
     };
 
@@ -213,9 +213,9 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
   SECTION("test then: chain then together, chianed style") {
     auto f1 = [](int v) -> P<double> {
       if (v > 10) {
-        return decltype(p)::pure<double>(11.1);
+        return decltype(p)::pure(11.1);
       } else {
-        return decltype(p)::pure<double>(1.1);
+        return decltype(p)::pure(1.1);
       }
     };
 
@@ -232,14 +232,20 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
     REQUIRE(v == 'a');
   }
 
-  // TODO
-  // SECTION("test option: first failure case") {
+  // SECTION("test option: first success case |") {
   //   using namespace cppparsec::chars;
 
-  //   auto v = ch('b').option(ch('a')).run(std::move(s));
-  //   std::cout << v << std::endl;
+  //   auto v = (ch('b') | ch('c') | ch('a') | ch('d')).run(std::move(s));
   //   REQUIRE(v == 'a');
   // }
+
+  SECTION("test option: first failure case") {
+    using namespace cppparsec::chars;
+
+    auto v = ch('b').option(ch('a')).run(std::move(s));
+    std::cout << v << std::endl;
+    REQUIRE(v == 'a');
+  }
 
   SECTION("test option: chain multiple cases") {}
 }

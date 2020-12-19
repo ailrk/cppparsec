@@ -82,15 +82,10 @@ public:
   // It can either be Ok indicates parse succeed.
   // or Error indicates parse failed.
   using Result = std::variant<Ok, Error>;
-
   using RunParserFnType = std::function<Result(InputStream)>;
 
   RunParserFnType run_parser;
 
-  // parser don't have state, so feel free
-  // to copy them.
-  // One catch is when RunParserFnType capture some
-  // non copyable.
   Parser(const Parser &) = default;
   Parser &operator=(const Parser &) = default;
 
@@ -99,46 +94,52 @@ public:
   // short hand for run_parser.
   T run(InputStream stream) {
     auto result = run_parser(std::move(stream));
-    auto [_, v] = std::move(std::get<Ok>(result));
-    return v;
+    return std::get<Ok>(result).val;
   }
 
-  // Declaration for Functor:
-  template <typename U> auto map(const function<U(T)> &f) -> Parser<S, U>;
-
-  // Declaration for Applicative:
+  template <typename U> auto map(function<U(T)> f) -> Parser<S, U>;
   template <typename U> static auto pure(U) -> Parser<S, U>;
-
   template <typename U>
   auto ap(const Parser<S, function<U(T)>> &fa) -> Parser<S, U>;
-
   template <typename U>
   auto then(const function<Parser<S, U>(T)> &f) -> Parser<S, U>;
-
-  // Declarations for Alternatives:
-  // identity of alternative.
+  template <typename U>
+  [[nodiscard]] friend auto operator>>=(Parser<S, T> &&p,
+                                        const std::function<Parser<S, U>(T)> &f)
+      -> Parser<S, U> {
+    return p.then(f);
+  }
+  template <typename U>
+  [[nodiscard]] friend auto operator>>(Parser<S, T> &&p, Parser<S, U> &&mb)
+      -> Parser<S, U> {
+    return p.template then<U>([=](T _) { return mb; });
+  }
   static auto empty() -> Parser<S, T> {
     return Parser([](auto stream) { return Parser::Error(nullptr, "empty"); });
   }
-
-  auto option(const Parser &) -> Parser;
+  auto option(Parser &&) -> Parser;
+  [[nodiscard]] friend auto operator|(Parser<S, T> &&p, Parser<S, T> &&other)
+      -> Parser<S, T> {
+    return p.option(other);
+  }
 };
 
 template <typename S, typename T>
 template <typename U>
-auto Parser<S, T>::map(const function<U(T)> &f) -> Parser<S, U> {
+auto Parser<S, T>::map(function<U(T)> f) -> Parser<S, U> {
   using PU = Parser<S, U>;
 
-  return PU([=](auto stream) -> typename PU::Result {
+  return PU([=, run_parser{std::move(run_parser)}](
+                auto stream) -> typename PU::Result {
     // all stream will be moved. The next state can be get from
     // the returned Result type.
 
     auto result = run_parser(std::move(stream));
     if (std::holds_alternative<Ok>(result)) {
-      auto [stream1, val1] = std::move(std::get<Ok>(result));
+      auto &[stream1, val1] = std::get<Ok>(result);
       return typename PU::Ok{std::move(stream1), static_cast<U>(f(val1))};
     } else {
-      auto [stream1, err] = std::move(std::get<Error>(result));
+      auto &[stream1, err] = std::get<Error>(result);
       return typename PU::Error{std::move(stream1), err};
     }
   });
@@ -160,26 +161,27 @@ auto Parser<S, T>::ap(const Parser<S, function<U(T)>> &fa) -> Parser<S, U> {
   using P = Parser<S, U>;
   using PF = Parser<S, function<U(T)>>;
 
-  return P([=](auto stream) -> typename P::Result {
-    // run fa to get the function.
+  return P([=, run_parser{std::move(run_parser)}](auto stream) ->
+           typename P::Result {
+             // run fa to get the function.
 
-    auto fa_result = fa.run_parser(std::move(stream));
+             auto fa_result = fa.run_parser(std::move(stream));
 
-    if (std::holds_alternative<typename PF::Ok>(fa_result)) {
-      auto [stream1, f] = std::move(std::get<typename PF::Ok>(fa_result));
+             if (std::holds_alternative<typename PF::Ok>(fa_result)) {
+               auto &[stream1, f] = std::get<typename PF::Ok>(fa_result);
 
-      // apply function to the result of run_parser.
-      auto result1 = run_parser(std::move(stream1));
-      auto [stream2, v1] = std::move(std::get<Ok>(result1));
-      return typename P::Ok{std::move(stream2), static_cast<U>(f(v1))};
+               // apply function to the result of run_parser.
+               auto result1 = run_parser(std::move(stream1));
+               auto &[stream2, v1] = std::get<Ok>(result1);
+               return typename P::Ok{std::move(stream2), static_cast<U>(f(v1))};
 
-    } else {
+             } else {
 
-      auto [stream1, e] = std::move(std::get<typename PF::Error>(fa_result));
-      std::cout << e << std::endl;
-      return typename P::Error{std::move(stream1), e};
-    }
-  });
+               auto &[stream1, e] = std::get<typename PF::Error>(fa_result);
+               std::cout << e << std::endl;
+               return typename P::Error{std::move(stream1), e};
+             }
+           });
 } // namespace cppparsec
 
 // fa * p
@@ -195,78 +197,59 @@ template <typename U>
 auto Parser<S, T>::then(const function<Parser<S, U>(T)> &fma) -> Parser<S, U> {
   using P = Parser<S, U>;
 
-  return P([=](auto stream) -> typename P::Result {
-    Result result = run_parser(std::move(stream)); // run self
+  return P([=, run_parser{std::move(run_parser)}](auto stream) ->
+           typename P::Result {
+             Result result = run_parser(std::move(stream)); // run self
 
-    if (std::holds_alternative<Ok>(result)) {
-      auto &[stream1, v1] = std::get<Ok>(result);
+             if (std::holds_alternative<Ok>(result)) {
+               auto &[stream1, v1] = std::get<Ok>(result);
 
-      P ma = fma(v1); // apply f to get a new parser.
-      auto ma_result = ma.run_parser(std::move(stream1));
+               // apply f to get a new parser.
+               P ma = fma(v1);
+               auto ma_result = ma.run_parser(std::move(stream1));
 
-      return std::move(std::get<typename decltype(ma)::Ok>(ma_result));
+               return std::move(std::get<typename decltype(ma)::Ok>(ma_result));
 
-    } else {
-      // need to move because we want to forward move out.
-      auto [stream1, error] = std::move(std::get<Error>(result));
-      std::cout << error << std::endl;
+             } else {
+               auto &[stream1, error] = std::get<Error>(result);
+               std::cout << error << std::endl;
 
-      return typename P::Error{std::move(stream1), error};
-    }
-  });
+               return typename P::Error{std::move(stream1), error};
+             }
+           });
 }
 
-// short hand for monadic bind.
-template <typename S, typename T, typename U>
-auto operator>>=(Parser<S, T> &p, const std::function<Parser<S, U>(T)> &f)
-    -> Parser<S, U> {
-  return p.then(f);
-}
-
-// short hand for monadic bind.
-template <typename S, typename T, typename U>
-auto operator>>(Parser<S, T> &p, const std::function<Parser<S, U>(T)> &f)
-    -> Parser<S, U> {
-  // TODO not implemented
-  return p.then(f);
-}
-
-// >> :: m a -> m b -> m b
-template <typename S, typename T, typename U>
-auto operator>>(Parser<S, T> &p, const Parser<S, U> &mb) -> Parser<S, U> {
-  return p.template then<U>([=](T _) { return mb; });
-}
-
+/*
+ * Pass a universal reference here because we want this function to work with
+ * both lvalue reference and temporary. In case ch('a').option(ch('b')), ch('b')
+ * will get moved directly. In case auto p = ch('b'); ch('a').option(p), we pass
+ * p as a lvalue reference.so we can reuse p in other combinators
+ */
 template <typename S, typename T>
-auto Parser<S, T>::option(const Parser<S, T> &other) -> Parser<S, T> {
+auto Parser<S, T>::option(Parser<S, T> &&other) -> Parser<S, T> {
   using P = Parser<S, T>;
 
-  return P([=](auto stream) -> P::Result {
+  return P([=, run_parser{std::move(run_parser)}](auto stream) -> P::Result {
     Result result = run_parser(std::move(stream));
 
     // success on the first
     if (std::holds_alternative<P::Ok>(result)) {
       return result;
 
+      // TODO can't read the alternative
     } else { // failed on the first
-      auto [stream1, _] = std::move(std::get<P::Error>(result));
-      auto result1 = std::move(other.run_parser(std::move(stream1)));
+      auto &[stream1, _] = std::get<P::Error>(result);
+      auto result1 = other.run_parser(std::move(stream1));
 
       if (std::holds_alternative<P::Ok>(result1)) {
         return result1;
 
       } else { // failed on the second
-        auto [stream1, e1] = std::move(std::get<P::Error>(result));
+        auto &[stream1, e1] = std::get<P::Error>(result);
         return P::Error{std::move(stream1), e1};
       }
     }
   });
-}
-
-// short hand for alternative.
-template <typename S, typename T>
-auto operator|(Parser<S, T> &p, const Parser<S, T> &other) -> Parser<S, T> {
-  return p.option(other);
 }
 
 // shorhand for string parser.

@@ -2,6 +2,7 @@
 #define CPPPARSEC_STREAM_
 
 #include <cassert>
+#include <concepts>
 #include <memory>
 #include <string_view>
 #include <type_traits>
@@ -31,7 +32,8 @@ struct has_stream_impl {
 template <typename T>
 struct is_stream : decltype(has_stream_impl::test<T>(0)) {};
 
-/* Abstract class for stream type. All parser will work on
+/*
+ * Abstract class for stream type. All parser will work on
  * some types of stream.
  */
 template <typename T, typename Self> class Stream {
@@ -94,6 +96,10 @@ bool StringStream::is_empty() const { return data.size() == 0; }
 size_t StringStream::get_line() const { return position.line; };
 
 size_t StringStream::get_col() const { return position.col; };
+
+/*
+ * you can technically look ahead arbitrary tokens.
+ */
 const std::string_view &StringStream::peek_stream() const { return data; };
 
 /*

@@ -128,23 +128,29 @@ auto item(char c) -> SP<char> {
   });
 }
 
-// parse the character that satisfy the predicate.
+/*
+ * parse a character that satisfy the predicate.
+ * `satisfy` only consume one token. It calls the predicate with 1 lookahead.
+ * If it doesn't match, doesn't consume any token.
+ */
 auto satisfy(const std::function<bool(char)> &pred) -> SP<char> {
   using InputStream = SP<char>::InputStream;
   using Result = SP<char>::Result;
 
   return SP<char>([=](InputStream stream) -> Result {
     char e = stream->peek_stream().at(0);
-    auto next_stream = stream->eat();
     if (pred(e)) {
+      auto next_stream = stream->eat();
       return SP<char>::Ok{std::move(next_stream), e};
     };
 
-    return SP<char>::Error{std::move(next_stream), "wrong"};
+    return SP<char>::Error{std::move(stream), "wrong"};
   });
 }
 
-// match for the given character.
+/*
+ * match a given character.
+ */
 auto ch(char c) -> SP<char> {
   return satisfy([=](char c1) { return c == c1; });
 }
