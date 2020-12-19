@@ -1,5 +1,4 @@
-#ifndef CPPPARSEC_STREAM_
-#define CPPPARSEC_STREAM_
+#pragma once
 
 #include <cassert>
 #include <concepts>
@@ -128,5 +127,3 @@ std::unique_ptr<StringStream> StringStream::eat() const { return eat(1); }
 } // namespace stream
 
 } // namespace cppparsec
-
-#endif /* ifndef CPPPARSEC_COMBINATOR_ */

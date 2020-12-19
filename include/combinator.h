@@ -1,6 +1,4 @@
-#ifndef CPPPARSEC_COMBINATOR_
-#define CPPPARSEC_COMBINATOR_
-
+#pragma once
 #include "parser.h"
 #include <algorithm>
 #include <deque>
@@ -191,5 +189,3 @@ auto to_upper = letter.map<char>([](char c) { return toupper(c); });
 } // namespace chars
 
 } // namespace cppparsec
-
-#endif /* ifndef CPPPARSEC_COMBINATOR_ */

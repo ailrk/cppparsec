@@ -1,6 +1,4 @@
-#ifndef CPPPARSEC_PARSER_
-#define CPPPARSEC_PARSER_
-
+#pragma once
 #include "stream.h"
 #include <functional>
 #include <iostream>
@@ -120,7 +118,7 @@ public:
   auto option(Parser &&) -> Parser;
   [[nodiscard]] friend auto operator|(Parser<S, T> &&p, Parser<S, T> &&other)
       -> Parser<S, T> {
-    return p.option(other);
+    return p.option(std::forward<decltype(other)>(other));
   }
 };
 
@@ -229,31 +227,32 @@ template <typename S, typename T>
 auto Parser<S, T>::option(Parser<S, T> &&other) -> Parser<S, T> {
   using P = Parser<S, T>;
 
-  return P([=, run_parser{std::move(run_parser)}](auto stream) -> P::Result {
-    Result result = run_parser(std::move(stream));
+  return P(
+      [other{std::forward<std::remove_reference_t<decltype(other)>>(other)},
+       run_parser{std::move(run_parser)}](auto stream) -> P::Result {
+        Result result = run_parser(std::move(stream));
 
-    // success on the first
-    if (std::holds_alternative<P::Ok>(result)) {
-      return result;
+        // success on the first
+        if (std::holds_alternative<P::Ok>(result)) {
+          return result;
 
-      // TODO can't read the alternative
-    } else { // failed on the first
-      auto &[stream1, _] = std::get<P::Error>(result);
-      auto result1 = other.run_parser(std::move(stream1));
+          // TODO can't read the alternative
+        } else { // failed on the first
+          auto &[stream1, _] = std::get<P::Error>(result);
+          auto result1 = other.run_parser(std::move(stream1));
 
-      if (std::holds_alternative<P::Ok>(result1)) {
-        return result1;
+          if (std::holds_alternative<P::Ok>(result1)) {
+            return result1;
 
-      } else { // failed on the second
-        auto &[stream1, e1] = std::get<P::Error>(result);
-        return P::Error{std::move(stream1), e1};
-      }
-    }
-  });
+          } else { // failed on the second
+            auto &[stream1, e1] = std::get<P::Error>(result);
+            return P::Error{std::move(stream1), e1};
+          }
+        }
+      });
 }
 
 // shorhand for string parser.
 template <typename T> using SP = Parser<stream::StringStream, T>;
 
 } // namespace cppparsec
-#endif /* ifndef CPPPARSEC_COMBINATOR_ */

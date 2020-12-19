@@ -1,4 +1,3 @@
-#define CATCH_CONFIG_MAIN
 #include "catch2/catch.hpp"
 #include "cppparsec.h"
 #include <iostream>
@@ -148,7 +147,7 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
 
     auto p2 = p.ap(p1);
     auto v = p2.run(std::move(s));
-    REQUIRE(2.1);
+    REQUIRE(v == 2.1);
   }
 
   SECTION("test ap: multiple") {
@@ -157,7 +156,7 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
 
     auto p2 = p1 * p;
     auto v = p2.run(std::move(s));
-    REQUIRE(2.1);
+    REQUIRE(v == 2.1);
   }
 
   SECTION("test then: simple bind") {
@@ -243,6 +242,14 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
     using namespace cppparsec::chars;
 
     auto v = ch('b').option(ch('a')).run(std::move(s));
+    std::cout << v << std::endl;
+    REQUIRE(v == 'a');
+  }
+
+  SECTION("test option: chains") {
+    using namespace cppparsec::chars;
+
+    auto v = ch('b').option(ch('c')).option(ch('a')).run(std::move(s));
     std::cout << v << std::endl;
     REQUIRE(v == 'a');
   }
