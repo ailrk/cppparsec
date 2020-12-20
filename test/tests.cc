@@ -1,5 +1,6 @@
 #include "catch2/catch.hpp"
 #include "cppparsec.h"
+#include <deque>
 #include <iostream>
 #include <signal.h>
 #include <vector>
@@ -7,6 +8,7 @@
 template <typename T>
 using P = cppparsec::Parser<cppparsec::stream::StringStream, T>;
 
+// StrinStream
 TEST_CASE("Create StrinStream", "StrinStream") {
   using namespace cppparsec::stream;
   StringStream s("abc\ndef\nghi\n");
@@ -74,6 +76,7 @@ TEST_CASE("Simple parser test") {
   }
 }
 
+// monadic parser
 TEST_CASE("Test Monadic Parser", "monadic parser") {
   using namespace cppparsec;
   using namespace cppparsec::stream;
@@ -167,7 +170,7 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
         return decltype(p)::pure<double>(1.1);
       }
     };
-    auto p1 = p.then<double>(f1);
+    auto p1 = p.bind<double>(f1);
     auto v = p1.run(std::move(s));
     REQUIRE(v == 1.1);
   }
@@ -192,7 +195,7 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
   //   REQUIRE(v == 1);
   // }
 
-  SECTION("test then: chain then together") {
+  SECTION("test bind: chain bind together") {
     auto f1 = [](int v) -> P<double> {
       if (v > 10) {
         return decltype(p)::pure(11.1);
@@ -201,9 +204,9 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
       }
     };
 
-    auto p1 = p.then<double>(f1);
-    auto p2 = p1.then<double>(f1);
-    auto p3 = p2.then<double>(f1);
+    auto p1 = p.bind<double>(f1);
+    auto p2 = p1.bind<double>(f1);
+    auto p3 = p2.bind<double>(f1);
     auto v = p3.run(std::move(s));
     REQUIRE(v == 1.1);
   }
@@ -219,7 +222,7 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
     };
 
     auto v =
-        p.then<double>(f1).then<double>(f1).then<double>(f1).run(std::move(s));
+        p.bind<double>(f1).bind<double>(f1).bind<double>(f1).run(std::move(s));
 
     REQUIRE(v == 1.1);
   }
@@ -231,32 +234,52 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
     REQUIRE(v == 'a');
   }
 
-  // SECTION("test option: first success case |") {
-  //   using namespace cppparsec::chars;
+  SECTION("test option: chain |") {
+    using namespace cppparsec::chars;
 
-  //   auto v = (ch('b') | ch('c') | ch('a') | ch('d')).run(std::move(s));
-  //   REQUIRE(v == 'a');
-  // }
+    auto v = (ch('b') | ch('c') | ch('a') | ch('d')).run(std::move(s));
+    REQUIRE(v == 'a');
+  }
 
   SECTION("test option: first failure case") {
     using namespace cppparsec::chars;
 
     auto v = ch('b').option(ch('a')).run(std::move(s));
-    std::cout << v << std::endl;
     REQUIRE(v == 'a');
   }
 
   SECTION("test option: chains") {
     using namespace cppparsec::chars;
 
-    auto v = ch('b').option(ch('c')).option(ch('a')).run(std::move(s));
-    std::cout << v << std::endl;
+    auto p = ch('c');
+    auto v = ch('b').option(p).option(ch('a')).run(std::move(s));
     REQUIRE(v == 'a');
   }
 
   SECTION("test option: chain multiple cases") {}
 }
 
+// generic combinators
+TEST_CASE("Generic combinators", "generic combinators") {
+  using namespace cppparsec;
+  using namespace cppparsec::stream;
+  using namespace cppparsec::chars;
+  using namespace cppparsec::comb;
+
+  auto s = std::make_unique<StringStream>("abc\ndef\nghi\n");
+
+  P<int> p([](P<int>::InputStream stream) -> P<int>::Result {
+    return P<int>::Ok{std::move(stream), 1};
+  });
+
+  SECTION("test attempt") {
+    auto p = attempt(ch('a').then(ch('b')).then(ch('d')));
+    auto s1 = p.run_parser(std::move(s)).index();
+    std::cout << s1 << std::endl;
+  }
+}
+
+// char combinators
 TEST_CASE("Char combinators", "char combinators") {
   using namespace cppparsec;
   using namespace cppparsec::stream;
@@ -269,8 +292,16 @@ TEST_CASE("Char combinators", "char combinators") {
     return P<int>::Ok{std::move(stream), 1};
   });
 
-  SECTION("Test char") {
-    auto v = ch('a').run(std::move(s));
-    REQUIRE(v == 'a');
+  SECTION("test char") {
+    auto v = ch('a').map<char>([](auto a) { return 'b'; }).run(std::move(s));
+    REQUIRE(v == 'b');
+  }
+
+  SECTION("oneof") {
+    auto chars = std::deque<char>{'a', 'b', 'c', 'd', 'e', 'f'};
+    auto v =
+        oneOf(chars).then(oneOf(chars)).then(oneOf(chars)).run(std::move(s));
+
+    REQUIRE(v == 'c');
   }
 }

@@ -19,59 +19,57 @@ namespace comb {
 template <typename S, typename T>
 auto attempt(const Parser<S, T> &p) -> Parser<S, T> {
   using P = Parser<S, T>;
+
   return P([=](typename P::InputStream stream) -> typename P::Result {
-    // copy the underlying stream
     auto prev_stream = std::make_unique<typename P::InputStreamType>(
         *stream); // copy the current stream.
     auto result = p.run_parser(std::move(stream));
 
-    // if success, just forward.
-    if (std::holds_alternative<typename P::Ok>(result)) {
+    if (P::isOk(result)) {
       return result;
     } else {
-      // if failed, return an error with the old stream.
-      return typename P::Error{std::move(prev_stream), "attempted"};
+      return P::mkError(std::move(prev_stream), "attempted");
     }
   });
 }
 
 // zero or more
 template <typename S, typename T>
-auto some(Parser<S, T> &v) -> Parser<S, std::deque<T>> {
+auto some(const Parser<S, T> &v) -> Parser<S, std::deque<T>> {
   using PFrom = Parser<S, T>;
   using PTo = Parser<S, std::deque<T>>;
-  using InputStream = typename Parser<S, T>::InputStream;
 
-  return PTo([=](InputStream stream) -> typename PTo::Result {
-    std::deque<T> acc{};
-    decltype(stream) next_stream;
+  return PTo([=](typename Parser<S, T>::InputStream stream) ->
+             typename PTo::Result {
+               std::deque<T> acc{};
+               decltype(stream) next_stream;
 
-    do {
-      // parse once first.
-      auto result = v.run_parser(std::move(stream));
+               do {
+                 // parse once first.
+                 auto result = v.run_parser(std::move(stream));
 
-      // parse end.
-      if (std::holds_alternative<typename PFrom::Error>(result)) {
+                 // parse end.
+                 if (PFrom::isError(result)) {
 
-        auto [stream1, _] = std::move(std::get<typename PFrom::Error>(result));
-        next_stream = std::move(stream1);
-        break;
+                   auto &[stream1, _] = std::get<typename PFrom::Error>(result);
+                   next_stream = std::move(stream1);
+                   break;
 
-      } else {
+                 } else {
 
-        auto [stream1, v] = std::move(std::get<typename PFrom::Ok>(result));
-        next_stream = std::move(stream1);
-        acc.push_back(std::move(v));
-      }
-    } while (1);
+                   auto &[stream1, v] = std::get<typename PFrom::Ok>(result);
+                   next_stream = std::move(stream1);
+                   acc.push_back(std::move(v));
+                 }
+               } while (1);
 
-    return typename PTo::Ok{std::move(next_stream), acc};
-  });
+               return typename PTo::Ok{std::move(next_stream), acc};
+             });
 }
 
 // one or more
 template <typename S, typename T>
-auto many(Parser<S, T> &v) -> Parser<S, std::deque<T>> {}
+auto many(const Parser<S, T> &v) -> Parser<S, std::deque<T>> {}
 
 // skip zero or more
 template <typename S, typename T>
