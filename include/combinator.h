@@ -20,56 +20,81 @@ template <typename S, typename T>
 auto attempt(const Parser<S, T> &p) -> Parser<S, T> {
   using P = Parser<S, T>;
 
-  return P([=](typename P::InputStream stream) -> typename P::Result {
-    auto prev_stream = std::make_unique<typename P::InputStreamType>(
-        *stream); // copy the current stream.
+  return {[=](typename P::InputStream stream) -> typename P::Result {
+    auto prev_stream = std::make_unique<typename P::InputStreamType>(*stream);
     auto result = p.run_parser(std::move(stream));
-
     if (P::isOk(result)) {
       return result;
     } else {
       return P::mkError(std::move(prev_stream), "attempted");
     }
-  });
+  }};
+}
+
+// parse one or more
+template <typename S, typename T>
+auto some(const Parser<S, T> &v) -> Parser<S, std::deque<T>> {
+  using PTo = Parser<S, std::deque<T>>;
+
+  return {
+      [=](typename Parser<S, T>::InputStream stream) -> typename PTo::Result {
+        std::deque<T> acc{};
+        decltype(stream) next_stream = std::move(stream);
+
+        do {
+
+          // parser v should handle the empty stream case.
+          auto result = v.run_parser(std::move(next_stream));
+
+          if (Parser<S, T>::isOk(result)) { // parse end.
+            auto &[stream1, v] = std::get<typename Parser<S, T>::Ok>(result);
+            next_stream = std::move(stream1);
+            acc.push_back(std::move(v));
+
+          } else {
+            auto &[stream1, _] = std::get<typename Parser<S, T>::Error>(result);
+
+            if (acc.size() > 0) {
+              return PTo::mkOk(std::move(stream1), acc);
+            } else {
+              return PTo::mkError(std::move(stream1), "wrong some");
+            }
+          }
+        } while (1);
+      }};
 }
 
 // zero or more
 template <typename S, typename T>
-auto some(const Parser<S, T> &v) -> Parser<S, std::deque<T>> {
-  using PFrom = Parser<S, T>;
+auto many(const Parser<S, T> &v) -> Parser<S, std::deque<T>> {
   using PTo = Parser<S, std::deque<T>>;
 
-  return PTo([=](typename Parser<S, T>::InputStream stream) ->
-             typename PTo::Result {
-               std::deque<T> acc{};
-               decltype(stream) next_stream;
+  return {
+      [=](typename Parser<S, T>::InputStream stream) -> typename PTo::Result {
+        std::deque<T> acc{};
+        decltype(stream) next_stream = std::move(stream);
 
-               do {
-                 // parse once first.
-                 auto result = v.run_parser(std::move(stream));
+        do {
 
-                 // parse end.
-                 if (PFrom::isError(result)) {
+          auto result = v.run_parser(std::move(next_stream));
 
-                   auto &[stream1, _] = std::get<typename PFrom::Error>(result);
-                   next_stream = std::move(stream1);
-                   break;
+          if (Parser<S, T>::isOk(result)) { // parse end.
+            auto &[stream1, v] = std::get<typename Parser<S, T>::Ok>(result);
+            next_stream = std::move(stream1);
+            acc.push_back(std::move(v));
 
-                 } else {
+          } else {
+            auto &[stream1, _] = std::get<typename Parser<S, T>::Error>(result);
 
-                   auto &[stream1, v] = std::get<typename PFrom::Ok>(result);
-                   next_stream = std::move(stream1);
-                   acc.push_back(std::move(v));
-                 }
-               } while (1);
-
-               return typename PTo::Ok{std::move(next_stream), acc};
-             });
+            if (acc.size() > 0) {
+              return PTo::mkOk(std::move(stream1), acc);
+            } else {
+              return PTo::mkError(std::move(stream1), "wrong some");
+            }
+          }
+        } while (1);
+      }};
 }
-
-// one or more
-template <typename S, typename T>
-auto many(const Parser<S, T> &v) -> Parser<S, std::deque<T>> {}
 
 // skip zero or more
 template <typename S, typename T>
@@ -113,15 +138,15 @@ auto item(char c) -> SP<char> {
   using InputStream = SP<char>::InputStream;
   using Result = SP<char>::Result;
 
-  return SP<char>([](InputStream stream) -> Result {
+  return {[](InputStream stream) -> Result {
     if (stream->is_empty()) {
-      return SP<char>::Error{std::move(stream), "EOF"};
+      return SP<char>::mkError(std::move(stream), "EOF");
     }
 
-    char e = stream->peek_stream().at(0);
+    char e = stream->lookahead()->at(0);
     auto next_stream = stream->eat();
-    return SP<char>::Ok{std::move(stream), e};
-  });
+    return SP<char>::mkOk(std::move(stream), e);
+  }};
 }
 
 /*
@@ -133,15 +158,19 @@ auto satisfy(const std::function<bool(char)> &pred) -> SP<char> {
   using InputStream = SP<char>::InputStream;
   using Result = SP<char>::Result;
 
-  return SP<char>([=](InputStream stream) -> Result {
-    char e = stream->peek_stream().at(0);
-    if (pred(e)) {
-      auto next_stream = stream->eat();
-      return SP<char>::Ok{std::move(next_stream), e};
-    };
+  return {[=](InputStream stream) -> Result {
+    if (auto result = stream->lookahead(); result.has_value()) {
+      char e = result->at(0);
 
-    return SP<char>::Error{std::move(stream), "wrong"};
-  });
+      if (pred(e)) {
+        auto next_stream = stream->eat();
+        return SP<char>::mkOk(std::move(next_stream), e);
+      } else {
+        return SP<char>::mkError(std::move(stream), "wrong");
+      }
+    }
+    return SP<char>::mkError(std::move(stream), "eof");
+  }};
 }
 
 /*

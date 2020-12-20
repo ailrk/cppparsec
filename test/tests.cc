@@ -16,11 +16,11 @@ TEST_CASE("Create StrinStream", "StrinStream") {
   REQUIRE(s.get_col() == 1);
   REQUIRE(s.get_line() == 1);
   REQUIRE(!s.is_empty());
-  REQUIRE(s.peek_stream().at(0) == 'a');
+  REQUIRE(s.lookahead()->at(0) == 'a');
 
   SECTION("eat 1 token") {
     auto new_s = s.eat();
-    REQUIRE(new_s->peek_stream().at(0) == 'b');
+    REQUIRE(new_s->lookahead()->at(0) == 'b');
     REQUIRE(new_s->get_col() == 2);
     REQUIRE(new_s->get_line() == 1);
   }
@@ -29,7 +29,7 @@ TEST_CASE("Create StrinStream", "StrinStream") {
     auto new_s = s.eat(5);
     REQUIRE(new_s->get_line() == 2);
     REQUIRE(new_s->get_col() == 2);
-    REQUIRE(new_s->peek_stream().at(0) == 'e');
+    REQUIRE(new_s->lookahead()->at(0) == 'e');
   }
 
   SECTION("test StringStream copy constructor") {
@@ -189,11 +189,12 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
   //   std::cout << v << std::endl;
   // }
 
-  // SECTION("test then: simple sequence overload") {
-  //   auto p1 = p >> p1;
-  //   auto v = p1.run(std::move(s));
-  //   REQUIRE(v == 1);
-  // }
+  SECTION("test then: simple sequence overload") {
+    using namespace cppparsec::chars;
+    auto p1 = ch('a') >> ch('b') >> ch('c');
+    auto v = p1.run(std::move(s));
+    REQUIRE(v == 'c');
+  }
 
   SECTION("test bind: chain bind together") {
     auto f1 = [](int v) -> P<double> {
@@ -234,10 +235,19 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
     REQUIRE(v == 'a');
   }
 
-  SECTION("test option: chain |") {
+  SECTION("test option: chain, start with rvalue |") {
     using namespace cppparsec::chars;
 
-    auto v = (ch('b') | ch('c') | ch('a') | ch('d')).run(std::move(s));
+    auto p1 = ch('c');
+    auto v = (ch('b') | p1 | ch('a') | ch('d')).run(std::move(s));
+    REQUIRE(v == 'a');
+  }
+
+  SECTION("test option: chain start with lvalue |") {
+    using namespace cppparsec::chars;
+
+    auto p1 = ch('b');
+    auto v = (p1 | ch('c') | ch('a') | ch('d')).run(std::move(s));
     REQUIRE(v == 'a');
   }
 
@@ -272,11 +282,46 @@ TEST_CASE("Generic combinators", "generic combinators") {
     return P<int>::Ok{std::move(stream), 1};
   });
 
-  SECTION("test attempt") {
-    auto p = attempt(ch('a').then(ch('b')).then(ch('d')));
-    auto s1 = p.run_parser(std::move(s)).index();
-    std::cout << s1 << std::endl;
+  SECTION("test attempt1, failed but preserve stream state") {
+    // should consume a, then fail.
+    auto pp = ch('a') >> ch('d');
+    auto p1 = attempt(pp);
+    auto [s1, _] = std::get<decltype(p1)::Error>(p1.run_parser(std::move(s)));
+    REQUIRE(s1->lookahead().value() == "abc\ndef\nghi\n");
   }
+
+  SECTION("test attempt2, succeed") {
+    // should consume a, then fail.
+    auto pp = ch('a') >> ch('d');
+    auto p1 = attempt(pp) | attempt(ch('a') >> ch('b') >> ch('c'));
+    auto v = p1.run(std::move(s));
+    REQUIRE(v == 'c');
+  }
+
+  SECTION("test attempt3, rvalue only") {
+    // should consume a, then fail.
+    auto p1 =
+        attempt(ch('a') >> ch('d')) | attempt(ch('a') >> ch('b') >> ch('c'));
+    auto v = p1.run(std::move(s));
+    REQUIRE(v == 'c');
+  }
+
+  SECTION("test some, exthausted") {
+    auto v = some(ch('a')).run(std::make_unique<StringStream>("aaa"));
+    REQUIRE(v == std::deque{'a', 'a', 'a'});
+  }
+
+  SECTION("test some non exthausted") {
+    auto v = some(ch('a')).run(std::make_unique<StringStream>("aaab"));
+    REQUIRE(v == std::deque{'a', 'a', 'a'});
+  }
+
+  SECTION("test some no match") {
+    REQUIRE_THROWS_AS(some(ch('a')).run(std::make_unique<StringStream>("bbb")),
+                      std::bad_variant_access);
+  }
+
+  SECTION("test many") {}
 }
 
 // char combinators
@@ -299,8 +344,8 @@ TEST_CASE("Char combinators", "char combinators") {
 
   SECTION("oneof") {
     auto chars = std::deque<char>{'a', 'b', 'c', 'd', 'e', 'f'};
-    auto v =
-        oneOf(chars).then(oneOf(chars)).then(oneOf(chars)).run(std::move(s));
+    auto v = (oneOf(chars) >> oneOf({'a', 'b', 'c'}) >> oneOf(chars))
+                 .run(std::move(s));
 
     REQUIRE(v == 'c');
   }

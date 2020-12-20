@@ -3,6 +3,7 @@
 #include <cassert>
 #include <concepts>
 #include <memory>
+#include <optional>
 #include <string_view>
 #include <type_traits>
 
@@ -21,8 +22,9 @@ struct has_stream_impl {
       typename T,
       typename get_line = decltype(std::declval<const T &>().get_line()),
       typename get_col = decltype(std::declval<const T &>().get_col()),
-      typename peek_stream = decltype(std::declval<const T &>().peek_stream()),
+
       typename eat = decltype(std::declval<const T &>().eat()),
+      typename lookahead = decltype(std::declval<const T &>().lookahead()),
       typename is_empty = decltype(std::declval<const T &>().is_empty())>
   static std::true_type test(int);
   template <typename...> static std::false_type test(...);
@@ -36,6 +38,7 @@ struct is_stream : decltype(has_stream_impl::test<T>(0)) {};
  * some types of stream.
  */
 template <typename T, typename Self> class Stream {
+
 public:
   using StreamItemType = T;
   virtual ~Stream() = default;
@@ -47,7 +50,7 @@ public:
   virtual bool is_empty() const = 0;
   virtual size_t get_line() const = 0;
   virtual size_t get_col() const = 0;
-  virtual const T &peek_stream() const = 0;
+  virtual const std::optional<const T> lookahead() const = 0;
 
   // need F bound polymorphism to return derived class.
   virtual std::unique_ptr<Self> eat(size_t n) const = 0;
@@ -84,7 +87,7 @@ public:
   bool is_empty() const override;
   size_t get_line() const override;
   size_t get_col() const override;
-  const std::string_view &peek_stream() const override;
+  const std::optional<const std::string_view> lookahead() const override;
 
   std::unique_ptr<StringStream> eat(size_t n) const override;
   std::unique_ptr<StringStream> eat() const override;
@@ -97,9 +100,14 @@ size_t StringStream::get_line() const { return position.line; };
 size_t StringStream::get_col() const { return position.col; };
 
 /*
- * you can technically look ahead arbitrary tokens.
+ * Return the underlying string view.
  */
-const std::string_view &StringStream::peek_stream() const { return data; };
+const std::optional<const std::string_view> StringStream::lookahead() const {
+  if (is_empty()) {
+    return {};
+  }
+  return {data};
+}
 
 /*
  * Eat the next n tokens, and return a new StringStream with
@@ -107,7 +115,10 @@ const std::string_view &StringStream::peek_stream() const { return data; };
  */
 std::unique_ptr<StringStream> StringStream::eat(size_t n) const {
   return std::make_unique<StringStream>(data.substr(n), [=]() {
-    assert(data.size() >= n);
+    if (is_empty()) {
+      return position;
+    }
+
     Position new_position = position;
 
     for (int i = 0; i < n; ++i) {
@@ -123,7 +134,6 @@ std::unique_ptr<StringStream> StringStream::eat(size_t n) const {
 };
 
 std::unique_ptr<StringStream> StringStream::eat() const { return eat(1); }
-
 } // namespace stream
 
 } // namespace cppparsec
