@@ -149,17 +149,17 @@ public:
   auto map(Fn f) -> Parser<S, typename function_traits<Fn>::return_type>;
   template <typename U> static auto pure(U) -> Parser<S, U>;
   template <typename U> auto ap(Parser<S, function<U(T)>> fa) -> Parser<S, U>;
-  template <typename U> auto bind(function<Parser<S, U>(T)> f) -> Parser<S, U>;
+  template <typename Fn>
+  auto bind(Fn f) -> typename function_traits<Fn>::return_type;
 
   template <typename U> auto then(Parser<S, U> p) -> Parser<S, U> {
-    return bind<U>([=](auto _) { return p; });
+    return bind([=](T _) -> Parser<S, U> { return p; });
   };
 
-  template <typename U>
-  [[nodiscard]] friend auto operator>>=(Parser<S, T> p,
-                                        std::function<Parser<S, U>(T)> f)
-      -> Parser<S, U> {
-    return p.bind<U>(f);
+  template <typename Fn>
+  [[nodiscard]] friend auto operator>>=(Parser<S, T> p, Fn f) ->
+      typename function_traits<Fn>::return_type {
+    return p.bind(f);
   }
 
   template <typename U>
@@ -181,9 +181,6 @@ public:
 };
 
 template <typename S, typename T>
-// template <typename U, typename Fn>
-// auto Parser<S, T>::map(typename function_traits<Fn>::type f) -> Parser<S, U>
-// {
 template <typename Fn>
 auto Parser<S, T>::map(Fn f)
     -> Parser<S, typename function_traits<Fn>::return_type> {
@@ -253,11 +250,10 @@ auto operator*(const Parser<S, function<U(T)>> &fa, Parser<S, T> &p)
   return p.ap(fa);
 }
 
-// Monad bind
 template <typename S, typename T>
-template <typename U>
-auto Parser<S, T>::bind(function<Parser<S, U>(T)> fma) -> Parser<S, U> {
-  using P = Parser<S, U>;
+template <typename Fn>
+auto Parser<S, T>::bind(Fn fma) -> typename function_traits<Fn>::return_type {
+  using P = typename function_traits<Fn>::return_type;
 
   return {[=, run_parser{std::move(run_parser)}](
               auto stream) -> typename P::Result {

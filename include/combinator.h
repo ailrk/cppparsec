@@ -118,8 +118,7 @@ template <typename Popen, typename Pclose, typename Pparser,
               is_parser<Popen>, is_parser<Pclose>, is_parser<Pparser>>>>
 auto between(Popen open, Pclose close, Pparser p) -> Pparser {
   using T = typename Pparser::ReturnType;
-  return (open >> p).template bind<T>(
-      [=](T v) { return close >> Pparser::pure(v); });
+  return (open >> p).bind([=](T v) { return close >> Pparser::pure(v); });
 }
 
 template <typename S, typename Sep, typename T>

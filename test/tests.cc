@@ -169,24 +169,31 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
         return decltype(p)::pure<double>(1.1);
       }
     };
-    auto p1 = p.bind<double>(f1);
+    auto p1 = p.bind(f1);
     auto v = p1.run(std::move(s));
     REQUIRE(v == 1.1);
   }
 
   // TODO simple bind sequence error
-  // SECTION("test then: simple bind") {
-  //   auto f1 = [](int v) -> P<double> {
-  //     if (v > 10) {
-  //       return decltype(p)::pure<double>(11.1);
-  //     } else {
-  //       return decltype(p)::pure<double>(1.1);
-  //     }
-  //   };
-  //   auto p1 = p >>= f1;
-  //   auto v = p1.run(std::move(s));
-  //   std::cout << v << std::endl;
-  // }
+  SECTION("test then: simple bind") {
+    auto f1 = [](int v) -> P<double> {
+      if (v > 10) {
+        return decltype(p)::pure<double>(11.1);
+      } else {
+        return decltype(p)::pure<double>(1.1);
+      }
+    };
+    auto p1 = (((p >>= f1) >>= f1) >>=
+               [](int v) {
+                 return decltype(p)::pure(std::vector{1, 3, 5});
+               }) |
+              p.map([](int _) {
+                return std::vector{1, 2, 3};
+              });
+
+    auto v = p1.run(std::move(s));
+    REQUIRE(v == std::vector{1, 3, 5});
+  }
 
   SECTION("test then: simple sequence overload") {
     using namespace cppparsec::chars;
@@ -204,9 +211,9 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
       }
     };
 
-    auto p1 = p.bind<double>(f1);
-    auto p2 = p1.bind<double>(f1);
-    auto p3 = p2.bind<double>(f1);
+    auto p1 = p.bind(f1);
+    auto p2 = p1.bind(f1);
+    auto p3 = p2.bind(f1);
     auto v = p3.run(std::move(s));
     REQUIRE(v == 1.1);
   }
@@ -221,8 +228,7 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
       }
     };
 
-    auto v =
-        p.bind<double>(f1).bind<double>(f1).bind<double>(f1).run(std::move(s));
+    auto v = p.bind(f1).bind(f1).bind(f1).run(std::move(s));
 
     REQUIRE(v == 1.1);
   }
