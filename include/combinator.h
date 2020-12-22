@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <deque>
 #include <functional>
+#include <numeric>
 #include <optional>
 #include <stdlib.h>
 #include <string>
@@ -16,8 +17,7 @@ namespace comb {
 // try a parser. if failed and consumed token, rewind back as it
 // haven't consume
 // This is the only case you want to copy the stream.
-template <typename S, typename T>
-auto attempt(const Parser<S, T> &p) -> Parser<S, T> {
+template <typename S, typename T> auto attempt(Parser<S, T> p) -> Parser<S, T> {
   using P = Parser<S, T>;
 
   return {[=](typename P::InputStream stream) -> typename P::Result {
@@ -33,7 +33,10 @@ auto attempt(const Parser<S, T> &p) -> Parser<S, T> {
 
 // parse one or more
 template <typename S, typename T>
-auto some(const Parser<S, T> &v) -> Parser<S, std::deque<T>> {
+auto some(
+    Parser<S, T> v, std::function<bool(int, int)> op_ = [](int a, int b) {
+      return a > b;
+    }) -> Parser<S, std::deque<T>> {
   using PTo = Parser<S, std::deque<T>>;
 
   return {
@@ -54,7 +57,7 @@ auto some(const Parser<S, T> &v) -> Parser<S, std::deque<T>> {
           } else {
             auto &[stream1, _] = std::get<typename Parser<S, T>::Error>(result);
 
-            if (acc.size() > 0) {
+            if (op_(acc.size(), 0)) {
               return PTo::mkOk(std::move(stream1), acc);
             } else {
               return PTo::mkError(std::move(stream1), "wrong some");
@@ -66,34 +69,8 @@ auto some(const Parser<S, T> &v) -> Parser<S, std::deque<T>> {
 
 // zero or more
 template <typename S, typename T>
-auto many(const Parser<S, T> &v) -> Parser<S, std::deque<T>> {
-  using PTo = Parser<S, std::deque<T>>;
-
-  return {
-      [=](typename Parser<S, T>::InputStream stream) -> typename PTo::Result {
-        std::deque<T> acc{};
-        decltype(stream) next_stream = std::move(stream);
-
-        do {
-
-          auto result = v.run_parser(std::move(next_stream));
-
-          if (Parser<S, T>::isOk(result)) { // parse end.
-            auto &[stream1, v] = std::get<typename Parser<S, T>::Ok>(result);
-            next_stream = std::move(stream1);
-            acc.push_back(std::move(v));
-
-          } else {
-            auto &[stream1, _] = std::get<typename Parser<S, T>::Error>(result);
-
-            if (acc.size() > 0) {
-              return PTo::mkOk(std::move(stream1), acc);
-            } else {
-              return PTo::mkError(std::move(stream1), "wrong some");
-            }
-          }
-        } while (1);
-      }};
+auto many(Parser<S, T> v) -> Parser<S, std::deque<T>> {
+  return some(v, [](int a, int b) { return a >= b; });
 }
 
 // skip zero or more
@@ -105,21 +82,45 @@ template <typename S, typename T>
 auto skip_many1(const Parser<S, T> &p) -> Parser<S, void>;
 
 template <typename S, typename T>
-auto repeat(int num, const Parser<S, T> &p) -> Parser<S, std::deque<T>>;
+auto repeat(int num, Parser<S, T> p) -> Parser<S, std::deque<T>>;
 
 template <typename S, typename T>
 auto token(const Parser<S, T> &p) -> Parser<S, T>;
 
 // if parse failed, replace the error message to the message provided.
 template <typename S, typename T>
-auto raise(std::string_view msg, const Parser<S, T> &p) -> Parser<S, T>;
+auto raise(Parser<S, T> p, std::string msg) -> Parser<S, T> {
+  return {[=](auto stream) -> typename Parser<S, T>::Result {
+    auto result = p.run_parser(std::move(stream));
+    if (Parser<S, T>::isError(result)) {
+      auto &[stream1, _] = std::get<typename Parser<S, T>::Error>(result);
+      return Parser<S, T>::mkError(std::move(stream1), msg);
+
+    } else {
+      return result;
+    }
+  }};
+}
 
 template <typename S, typename T>
-auto choice(const std::vector<Parser<S, T>> &ps);
+auto operator/(Parser<S, T> p, std::string msg) -> Parser<S, T> {
+  return raise(p, msg);
+}
 
-template <typename S, typename Open, typename Close, typename T>
-auto between(const Parser<S, Open> &open, const Parser<S, Close> &close,
-             const Parser<S, T> &p) -> Parser<S, T>;
+template <typename S, typename T>
+auto choice(const std::deque<Parser<S, T>> &ps) -> Parser<S, T> {
+  return std::accumulate(ps.begin(), ps.end(), Parser<S, T>::empty(),
+                         [](auto a, auto b) { return a | b; });
+}
+
+template <typename Popen, typename Pclose, typename Pparser,
+          typename = std::enable_if_t<std::conjunction_v<
+              is_parser<Popen>, is_parser<Pclose>, is_parser<Pparser>>>>
+auto between(Popen open, Pclose close, Pparser p) -> Pparser {
+  using T = typename Pparser::ReturnType;
+  return (open >> p).template bind<T>(
+      [=](T v) { return close >> Pparser::pure(v); });
+}
 
 template <typename S, typename Sep, typename T>
 auto sep_by(const Parser<S, T> &p, const Parser<S, Sep> &sep) -> Parser<S, T>;
@@ -154,7 +155,7 @@ auto item(char c) -> SP<char> {
  * `satisfy` only consume one token. It calls the predicate with 1 lookahead.
  * If it doesn't match, doesn't consume any token.
  */
-auto satisfy(const std::function<bool(char)> &pred) -> SP<char> {
+auto satisfy(std::function<bool(char)> pred) -> SP<char> {
   using InputStream = SP<char>::InputStream;
   using Result = SP<char>::Result;
 
@@ -209,9 +210,9 @@ auto spaces = comb::many(space);
 auto spaces1 = comb::some(space);
 
 // parse a letter and convert it to lower case
-auto to_lower = letter.map<char>([](char c) { return tolower(c); });
+auto to_lower = letter.map([](char c) { return tolower(c); });
 
-auto to_upper = letter.map<char>([](char c) { return toupper(c); });
+auto to_upper = letter.map([](char c) { return toupper(c); });
 
 } // namespace chars
 

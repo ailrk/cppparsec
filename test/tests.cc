@@ -68,7 +68,7 @@ TEST_CASE("Simple parser test") {
   }
 
   SECTION("more compelx run") {
-    auto v = p.map<double>([](int v) {
+    auto v = p.map([](int v) -> double {
                 return v + 1.1;
                 ;
               }).run(std::move(s));
@@ -88,7 +88,7 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
   });
 
   SECTION("test functor: Int -> char") {
-    auto p1 = p.map<char>([](int v) { return 'a'; });
+    auto p1 = p.map([](int v) -> char { return 'a'; });
 
     auto result = p1.run_parser(std::move(s));
     auto &[s1, v] = std::get<decltype(p1)::Ok>(result);
@@ -96,9 +96,9 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
   }
 
   SECTION("test functor: compose int -> double -> int -> double") {
-    auto p1 = p.map<int>([](double v) { return v + 1; });
-    auto p2 = p1.map<int>([](double v) { return ((int)v * 100) % 10; });
-    auto p3 = p2.map<double>([](int v) { return v + 1.1; });
+    auto p1 = p.map([](double v) -> double { return v + 1; });
+    auto p2 = p1.map([](double v) -> int { return ((int)v * 100) % 10; });
+    auto p3 = p2.map([](int v) -> double { return v + 1.1; });
 
     auto v = p3.run(std::move(s));
     REQUIRE(v == 1.1);
@@ -106,23 +106,22 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
 
   SECTION("test functor compose: chain style1") {
     auto f = [](int v) { return v + 2; };
-    auto v = p.map<int>(f).map<int>(f).map<int>(f).run(std::move(s));
+    auto v = p.map(f).map(f).map(f).run(std::move(s));
     REQUIRE(v == 7);
   }
 
   SECTION("test functor compose: chain style2") {
-    auto f = [](int v) { return v + 2; };
+    auto f = [](int v) -> int { return v + 2; };
 
     // the above test works, but this one somehow doesn't
-    auto p1 = p.map<double>([](double v) {
-                 return v + 2;
-               }).map<int>(f); //.map<int>(f);
+    auto p1 =
+        p.map([](double v) -> int { return v + 2; }).map(f); //.map<int>(f);
     auto v = p1.run(std::move(s));
     REQUIRE(v == 5);
   }
 
   SECTION("test functor: int -> vector<int>") {
-    auto p1 = decltype(p)::pure(10).map<std::vector<int>>([](int v) {
+    auto p1 = decltype(p)::pure(10).map([](int v) {
       std::vector<int> vec{};
       for (int i = 0; i < v; ++i) {
         vec.push_back(1);
@@ -265,12 +264,10 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
     auto v = ch('b').option(p).option(ch('a')).run(std::move(s));
     REQUIRE(v == 'a');
   }
-
-  SECTION("test option: chain multiple cases") {}
 }
 
-// generic combinators
-TEST_CASE("Generic combinators", "generic combinators") {
+// generic combinators1
+TEST_CASE("Generic combinators1", "generic combinators1") {
   using namespace cppparsec;
   using namespace cppparsec::stream;
   using namespace cppparsec::chars;
@@ -321,8 +318,60 @@ TEST_CASE("Generic combinators", "generic combinators") {
                       std::bad_variant_access);
   }
 
-  SECTION("test many") {}
+  SECTION("test many, exthausted") {
+    auto v = many(ch('a')).run(std::make_unique<StringStream>("aaa"));
+    REQUIRE(v == std::deque{'a', 'a', 'a'});
+  }
+
+  SECTION("test some no match") {
+    auto v = many(ch('b')).run(std::make_unique<StringStream>("aaa"));
+    REQUIRE(v == std::deque<char>());
+  }
 }
+
+// generic combinators2
+TEST_CASE("Generic combinators2", "generic combinators2") {
+  using namespace cppparsec;
+  using namespace cppparsec::stream;
+  using namespace cppparsec::chars;
+  using namespace cppparsec::comb;
+
+  SECTION("test raise ") {
+    auto v = raise(some(ch('b') >> ch('a')), "raised")
+                 .run_err(std::make_unique<StringStream>("aaa"));
+    REQUIRE(v == "raised");
+  }
+
+  SECTION("test raise \\") {
+    auto v = (some(ch('b') >> ch('a')) / "raised")
+                 .run_err(std::make_unique<StringStream>("aaa"));
+    REQUIRE(v == "raised");
+  }
+
+  SECTION("test choice") {
+    auto v = choice(std::deque{ch('a'), ch('b'), ch('c')})
+                 .run(std::make_unique<StringStream>("c"));
+    REQUIRE(v == 'c');
+  }
+
+  SECTION("test between, lval") {
+    auto p1 = ch('{');
+    auto p2 = ch('}');
+    auto p3 = ch('a');
+    auto v = between(p1, p2, p3).run(std::make_unique<StringStream>("{a}"));
+    REQUIRE(v == 'a');
+  }
+
+  SECTION("test between, rval") {
+    auto p1 = ch('{');
+    auto v = between(ch('{'), ch('}'), ch('a'))
+                 .run(std::make_unique<StringStream>("{a}"));
+    REQUIRE(v == 'a');
+  }
+}
+
+void foo(int &, const int &&);
+void foo(int &&, const int &&);
 
 // char combinators
 TEST_CASE("Char combinators", "char combinators") {
@@ -338,7 +387,7 @@ TEST_CASE("Char combinators", "char combinators") {
   });
 
   SECTION("test char") {
-    auto v = ch('a').map<char>([](auto a) { return 'b'; }).run(std::move(s));
+    auto v = ch('a').map([](char a) { return 'b'; }).run(std::move(s));
     REQUIRE(v == 'b');
   }
 
