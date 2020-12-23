@@ -1,5 +1,6 @@
 #include "catch2/catch.hpp"
 #include "cppparsec.h"
+#include <concepts>
 #include <deque>
 #include <iostream>
 #include <signal.h>
@@ -38,6 +39,11 @@ TEST_CASE("Create StrinStream", "StrinStream") {
     REQUIRE(s1.get_col() == s2.get_col());
     REQUIRE(s1.get_col() == s.get_col());
   }
+
+  SECTION("const expr test") {
+    constexpr StringStream s1("abc\ndef\nghi\n");
+    REQUIRE(s1.lookahead().value().at(0) == 'a');
+  }
 }
 
 TEST_CASE("Simple parser test") {
@@ -47,7 +53,7 @@ TEST_CASE("Simple parser test") {
   auto s = std::make_unique<StringStream>("abc\ndef\nghi\n");
 
   P<int> p([](P<int>::InputStream stream) -> P<int>::Result {
-    return P<int>::Ok{std::move(stream), 1};
+    return P<int>::Ok(std::move(stream), 1);
   });
 
   SECTION("test copy Parser construtors") {
@@ -57,8 +63,8 @@ TEST_CASE("Simple parser test") {
   }
 
   SECTION("run parser") {
-    auto result = p.run_parser(std::move(s));
-    auto &[s1, v] = std::get<decltype(p)::Ok>(result);
+    auto result = p.unparser(std::move(s));
+    auto &[s1, _, v] = std::get<decltype(p)::Ok>(result);
     REQUIRE(v == 1);
   }
 
@@ -90,8 +96,8 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
   SECTION("test functor: Int -> char") {
     auto p1 = p.map([](int v) -> char { return 'a'; });
 
-    auto result = p1.run_parser(std::move(s));
-    auto &[s1, v] = std::get<decltype(p1)::Ok>(result);
+    auto result = p1.unparser(std::move(s));
+    auto &[s1, _, v] = std::get<decltype(p1)::Ok>(result);
     REQUIRE(v == 'a');
   }
 
@@ -136,9 +142,9 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
 
   SECTION("test ap: pure int") {
     auto p1 = decltype(p)::pure<char>('a');
-    auto result = p1.run_parser(std::move(s));
+    auto result = p1.unparser(std::move(s));
 
-    auto &[s1, v] = std::get<decltype(p1)::Ok>(result);
+    auto &[s1, _, v] = std::get<decltype(p1)::Ok>(result);
     REQUIRE(v == 'a');
   }
 
@@ -183,13 +189,9 @@ TEST_CASE("Test Monadic Parser", "monadic parser") {
         return decltype(p)::pure<double>(1.1);
       }
     };
-    auto p1 = (((p >>= f1) >>= f1) >>=
-               [](int v) {
-                 return decltype(p)::pure(std::vector{1, 3, 5});
-               }) |
-              p.map([](int _) {
-                return std::vector{1, 2, 3};
-              });
+    auto p1 = (((p >>= f1) >>= f1) >>= [](int v) {
+      return decltype(p)::pure(std::vector{1, 3, 5});
+    });
 
     auto v = p1.run(std::move(s));
     REQUIRE(v == std::vector{1, 3, 5});
@@ -289,7 +291,7 @@ TEST_CASE("Generic combinators1", "generic combinators1") {
     // should consume a, then fail.
     auto pp = ch('a') >> ch('d');
     auto p1 = attempt(pp);
-    auto [s1, _] = std::get<decltype(p1)::Error>(p1.run_parser(std::move(s)));
+    auto [s1, _, _1] = std::get<decltype(p1)::Error>(p1.unparser(std::move(s)));
     REQUIRE(s1->lookahead().value() == "abc\ndef\nghi\n");
   }
 
@@ -345,19 +347,19 @@ TEST_CASE("Generic combinators2", "generic combinators2") {
   SECTION("test raise ") {
     auto v = raise(some(ch('b') >> ch('a')), "raised")
                  .run_err(std::make_unique<StringStream>("aaa"));
-    REQUIRE(v == "raised");
+    REQUIRE(v.to_string() == "line: 1, col: 1, Unknown error: raised");
   }
 
   SECTION("test raise \\") {
     auto v = (some(ch('b') >> ch('a')) / "raised")
                  .run_err(std::make_unique<StringStream>("aaa"));
-    REQUIRE(v == "raised");
+    ch('c') / "d";
+    REQUIRE(v.to_string() == "line: 1, col: 1, Unknown error: raised");
   }
 
   SECTION("test choice") {
     auto v = choice(std::deque{ch('a'), ch('b'), ch('c')})
                  .run(std::make_unique<StringStream>("c"));
-    REQUIRE(v == 'c');
   }
 
   SECTION("test between, lval") {

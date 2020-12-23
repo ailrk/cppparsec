@@ -16,51 +16,32 @@ struct Position {
 
 namespace stream {
 
-// check if is stream.
-struct has_stream_impl {
-  template <
-      typename T,
-      typename get_line = decltype(std::declval<const T &>().get_line()),
-      typename get_col = decltype(std::declval<const T &>().get_col()),
+// template <typename T> concept stream_type = is_stream<T>::value;
 
-      typename eat = decltype(std::declval<const T &>().eat()),
-      typename lookahead = decltype(std::declval<const T &>().lookahead()),
-      typename is_empty = decltype(std::declval<const T &>().is_empty())>
-  static std::true_type test(int);
-  template <typename...> static std::false_type test(...);
-};
+template <typename T> concept stream_type = requires(T t) {
+  { t.get_line() }
+  ->std::convertible_to<size_t>;
 
-template <typename T>
-struct is_stream : decltype(has_stream_impl::test<T>(0)) {};
+  { t.get_col() }
+  ->std::convertible_to<size_t>;
 
-/*
- * Abstract class for stream type. All parser will work on
- * some types of stream.
- */
-template <typename T, typename Self> class Stream {
+  { t.lookahead() }
+  ->std::convertible_to<std::optional<typename T::DataType>>;
 
-public:
-  using StreamItemType = T;
-  virtual ~Stream() = default;
-  Stream() = default;
+  { t.get_pos() }
+  ->std::same_as<Position>;
 
-  Stream(const Stream &) = delete;
-  Stream &operator=(const Stream &) = delete;
+  { t.eat() }
+  ->std::same_as<std::unique_ptr<T>>;
 
-  virtual bool is_empty() const = 0;
-  virtual size_t get_line() const = 0;
-  virtual size_t get_col() const = 0;
-  virtual const std::optional<const T> lookahead() const = 0;
-
-  // need F bound polymorphism to return derived class.
-  virtual std::unique_ptr<Self> eat(size_t n) const = 0;
-  virtual std::unique_ptr<Self> eat() const = 0;
+  { t.is_empty() }
+  ->std::same_as<bool>;
 };
 
 /*
  * Stream type for string_view.
  */
-class StringStream : public Stream<std::string_view, StringStream> {
+class StringStream {
 
   std::string_view data;
   mutable Position position;
@@ -68,41 +49,47 @@ class StringStream : public Stream<std::string_view, StringStream> {
 public:
   // update stream, return a new String Stream.
   // note because it just pass a string view, copy cost almost nothing.
-  StringStream(const std::string_view &s, const Position &pos)
+  using DataType = std::string_view;
+  constexpr StringStream(const std::string_view &s, const Position &pos)
       : data(s), position(pos) {}
 
-  StringStream(std::string_view s) : data(s), position(Position{1, 1}) {}
+  constexpr StringStream(std::string_view s)
+      : data(s), position(Position{1, 1}) {}
 
   // copy the string stream with the same state.
   // Thisis essential for retrying.
-  StringStream(const StringStream &stream)
+  constexpr StringStream(const StringStream &stream)
       : data(stream.data), position(stream.position) {}
 
-  Stream &operator=(const StringStream &stream) {
+  constexpr StringStream &operator=(const StringStream &stream) {
     data = stream.data;
     position = stream.position;
     return *this;
   }
 
-  bool is_empty() const override;
-  size_t get_line() const override;
-  size_t get_col() const override;
-  const std::optional<const std::string_view> lookahead() const override;
+  constexpr bool is_empty() const;
+  constexpr size_t get_line() const;
+  constexpr size_t get_col() const;
+  constexpr Position get_pos() const;
+  constexpr const std::optional<const std::string_view> lookahead() const;
 
-  std::unique_ptr<StringStream> eat(size_t n) const override;
-  std::unique_ptr<StringStream> eat() const override;
+  std::unique_ptr<StringStream> eat(size_t n) const;
+  std::unique_ptr<StringStream> eat() const;
 };
 
-bool StringStream::is_empty() const { return data.size() == 0; }
+constexpr bool StringStream::is_empty() const { return data.size() == 0; }
 
-size_t StringStream::get_line() const { return position.line; };
+constexpr size_t StringStream::get_line() const { return position.line; };
 
-size_t StringStream::get_col() const { return position.col; };
+constexpr size_t StringStream::get_col() const { return position.col; };
+
+constexpr Position StringStream::get_pos() const { return position; }
 
 /*
  * Return the underlying string view.
  */
-const std::optional<const std::string_view> StringStream::lookahead() const {
+constexpr const std::optional<const std::string_view>
+StringStream::lookahead() const {
   if (is_empty()) {
     return {};
   }
