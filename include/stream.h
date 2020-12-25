@@ -12,6 +12,18 @@ namespace cppparsec {
 struct Position {
   size_t line;
   size_t col;
+
+  [[nodiscard]] friend bool operator<(const Position &p1, const Position &p2) {
+    return (p1.line < p2.line) || (p1.col < p2.col);
+  }
+
+  [[nodiscard]] friend bool operator==(const Position &p1, const Position &p2) {
+    return p1.col == p2.col && p1.line == p2.line;
+  }
+
+  [[nodiscard]] friend bool operator!=(const Position &p1, const Position &p2) {
+    return !(p1 == p2);
+  }
 };
 
 namespace stream {

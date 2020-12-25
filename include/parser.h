@@ -13,12 +13,7 @@
 namespace cppparsec {
 using std::function;
 
-/*
- * function traits
- *  @function_traits<Fn>::type
- *  @function_traits<Fn>::return_type
- *  @template <typename ...Args> function_traits<Fn>::args_pack<Args...>
- */
+// function trait
 template <typename T> struct function_traits_impl { using type = void; };
 template <typename Ret, typename Class, typename... Args>
 struct function_traits_impl<Ret (Class::*)(Args...) const> {
@@ -41,6 +36,10 @@ template <typename Fn1, typename Fn2> decltype(auto) operator<(Fn1 f, Fn2 g) {
   return [=](auto a) { return f(g(a)); };
 }
 
+template <typename Fn1, typename Fn2> auto operator<(Fn1 f, Fn2 g) {
+  return [=](auto &&... a) { return f(g(a...)); };
+}
+
 /*
  * Store parering error informations.
  */
@@ -56,6 +55,10 @@ public:
   };
 
   using Type = E;
+
+  ParserError()
+      : type(E::UnknownError), message("default unknown error"),
+        position({0, 0}) {}
 
   ParserError(Type type, std::string msg, Position pos)
       : type(type), message(msg), position(pos) {}
@@ -94,6 +97,28 @@ public:
     return os;
   }
 
+  ParserError merge(ParserError p) {
+
+    // discard empty error message.
+    if (this->message.size() > 0 && p.message.size() == 0) {
+    } else if (this->message.size() == 0 && p.message.size() > 0) {
+      this->message = p.message;
+
+    } else { // prefer the latest error.
+      if (this->position == p.position) {
+        this->message += p.message;
+      } else if (this->position < p.position) {
+        this->message = p.message;
+      }
+    }
+    return *this;
+  }
+
+  [[nodiscard]] friend bool operator==(const ParserError &e1,
+                                       const ParserError &e2) {
+    return e1.message == e2.message;
+  }
+
 private:
   E type;
   std::string message;
@@ -108,10 +133,10 @@ template <typename T> concept parser_type = requires {
   typename T::Result;        // Ok or Error
   typename T::Error;         // return type when parser succeed.
   typename T::Ok;            // return type when parser failed.
-}
-&&requires(T t) {
-  { t.unparser }
-  ->std::convertible_to<typename T::UnParser>;
+  requires requires(T t) {
+    { t.unparser }
+    ->std::convertible_to<typename T::UnParser>;
+  };
 };
 
 /*
@@ -124,90 +149,100 @@ public:
   using Source = S;
   using InputStream = std::unique_ptr<Source>;
 
-  // Ok takes the onwership of the stream
   struct Ok {
-    InputStream stream; // always move.
-    bool consumed;      // indicate if the stream was consumed.
-    T val;
+    InputStream stream;             // always move.
+    std::optional<T> val;           // value of the parser.
+    std::optional<ParserError> err; // optional error on parser succeed
+    bool consumed;                  // indicate if the stream was consumed.
 
-    Ok(InputStream &&stream, bool consumed, T val)
-        : stream(std::move(stream)), consumed(consumed), val(val) {}
-
-    Ok(InputStream &&stream, T val) : Ok{std::move(stream), true, val} {}
+    Ok(InputStream &&stream, std::optional<T> val = {}, bool consumed = {},
+       ParserError err = {})
+        : stream(std::move(stream)), consumed(consumed), val(val), err(err) {}
   };
 
-  // Error also takes the onwership of the stream
   struct Error {
-    InputStream stream; // always move.
-    bool consumed;      // indicate if the stream was consumed.
-    ParserError err;
+    ParserError err; // error on parse failed.
+    bool consumed;   // indicate if the stream was consumed.
 
-    Error(InputStream stream, bool consumed, ParserError err)
-        : stream(std::move(stream)), consumed(consumed), err(err) {}
+    Error(ParserError err = {}, bool consumed = {})
+        : err(err), consumed(consumed) {}
 
-    Error(InputStream stream, bool consumed, std::string msg)
-        : stream(std::move(stream)), consumed(consumed),
-          err(ParserError::E::UnknownError, msg, this->stream->get_pos()) {}
-
-    Error(InputStream &&stream, std::string msg)
-        : Error(std::move(stream), true, msg) {}
-
-    Error(InputStream &&stream, const ParserError &error)
-        : Error(std::move(stream), true, error) {}
+    Error(std::string msg = "default", bool consumed = {})
+        : err(ParserError::E::UnknownError, msg, this->stream->get_pos()),
+          consumed(consumed) {}
 
     std::string err_msg() const { return err.to_string(); }
   };
 
-  // Return type of unparser.
-  // It can either be Ok indicates parse succeed.
+  // Return type of unparser. It can either be Ok indicates parse succeed.
   // or Error indicates parse failed.
   using Result = std::variant<Ok, Error>;
-  using OkCallback = function<Result(T, Error)>;
+  using OkCallback = function<Result(InputStream, T, Error)>;
   using ErrorCallback = function<Result(Error)>;
-  // using UnParser = function<Result(InputStream,
-  //                                         OkCallback,    // consumed ok
-  //                                         ErrorCallback, // consumed err
-  //                                         OkCallback,    // empty ok
-  //                                         ErrorCallback) // empty err
-  //                                  >;
+  struct UnParserCallbacks {
+    InputStream stream;
+    OkCallback cok;     // consumed ok
+    ErrorCallback cerr; // consumed err
+    OkCallback eok;     // empty ok
+    ErrorCallback eerr; // empty err
+  };
+  using UnParser = function<Result(UnParserCallbacks)>;
 
-  using UnParser = function<Result(InputStream)>;
+  // using UnParser = function<Result(InputStream)>;
 
   UnParser unparser;
+
+  // short hand for invoking unparser
+  // auto unparser_(UnParserCallbacks c) {
+  //   return unparser(std::move(c.stream), c.cok, c.cerr, c.eok, c.eerr);
+  // }
 
   Parser(const Parser &) = default;
   Parser &operator=(const Parser &) = default;
 
-  // simple TODO
   Parser(const UnParser &f) : unparser(f){};
 
-  // Parser(const UnParser &f, const OkCallback &consumed_ok,
-  //        const ErrorCallback &consumeed_error, const OkCallback &empty_ok,
-  //        const ErrorCallback &empty_error)
-  //     : unparser(f){};
+  // low level simple unpack of the parser.
+  Result run_parsec(InputStream stream);
+
+  // low level create a parser.
+  template <typename Fn, typename = std::enable_if_t<std::is_convertible_v<
+                             Fn, std::function<Result(InputStream)>>>>
+  static Parser<S, T> mk_parsec(const Fn &fn);
 
   static bool isOk(const Result &r) { return std::holds_alternative<Ok>(r); }
   static bool isError(const Result &r) {
     return std::holds_alternative<Error>(r);
   }
-
-  // short hand for unparser.
-  T run(InputStream stream) {
-    auto result = unparser(std::move(stream));
-    return std::get<Ok>(result).val;
+  static bool isConsumed(const Result &r) {
+    if (isOk(r)) {
+      return static_cast<Ok>(r).consumed;
+    } else {
+      return static_cast<Error>(r).consumed;
+    }
   }
 
-  // short hand for unparser that returns an error.
-  ParserError run_err(InputStream stream) {
-    auto result = unparser(std::move(stream));
-    return std::get<Error>(result).err;
-  }
+  // // short hand for unparser.
+  // T run(InputStream stream) {
+  //   auto result = unparser(std::move(stream));
+  //   return std::get<Ok>(result).val;
+  // }
+
+  // // short hand for unparser that returns an error.
+  // ParserError run_err(InputStream stream) {
+  //   auto result = unparser(std::move(stream));
+  //   return std::get<Error>(result).err;
+  // }
 
   template <typename Fn>
   auto map(Fn f) -> Parser<S, typename function_traits<Fn>::return_type>;
   template <typename U> static auto pure(U) -> Parser<S, U>;
   template <typename U> auto ap(Parser<S, function<U(T)>> fa) -> Parser<S, U>;
-  template <typename Fn>
+
+  template <
+      typename Fn,
+      typename = std::enable_if<std::is_convertible_v<
+          Fn, std::function<typename function_traits<Fn>::return_type(T)>>>>
   auto bind(Fn f) -> typename function_traits<Fn>::return_type;
 
   template <typename U> auto then(Parser<S, U> p) -> Parser<S, U> {
@@ -238,6 +273,56 @@ public:
   }
 };
 
+// low level unpack a parser.
+template <stream::stream_type S, typename T>
+typename Parser<S, T>::Result Parser<S, T>::run_parsec(InputStream stream) {
+  static auto cok = [](InputStream stream, T val, ParserError err) {
+    return Ok(std::move(stream), val, err, true);
+  };
+  static auto cerr = [](ParserError err) { return Error(err, true); };
+  static auto eok = [](InputStream stream, T val, ParserError err) {
+    return Ok(std::move(stream), val, err, false);
+  };
+  static auto eerr = [](ParserError err) { return Error(err, false); };
+
+  return unparser({.stream = std::move(stream),
+                   .cok = cok,
+                   .cerr = cerr,
+                   .eok = eok,
+                   .eerr = eerr});
+}
+
+// TODO
+// low level create a parser
+template <stream::stream_type S, typename T>
+template <typename Fn, typename>
+Parser<S, T> Parser<S, T>::mk_parsec(const Fn &fn) {
+  static_assert(
+      std::is_same_v<typename function_traits<Fn>::return_type, Result>);
+
+  return {[=](UnParserCallbacks cbs) {
+    typename function_traits<Fn>::return_type res = fn(std::move(cbs.stream));
+
+    if (isConsumed(res)) {
+      if (isOk(res)) {
+        Ok s = static_cast<Ok>(res);
+        return cbs.cok(std::move(s.stream), s.val, s.err);
+      } else {
+        Error s = static_cast<Error>(res);
+        return cerr(s.err);
+      }
+    } else {
+      if (isOk(res)) {
+        Ok s = static_cast<Ok>(res);
+        return cbs.eok(std::move(s.stream), s.val, s.err);
+      } else {
+        Error s = static_cast<Error>(res);
+        return cbs.eerr(s.err);
+      }
+    }
+  }};
+}
+
 template <stream::stream_type S, typename T>
 template <typename Fn>
 auto Parser<S, T>::map(Fn f)
@@ -245,31 +330,33 @@ auto Parser<S, T>::map(Fn f)
   using U = typename function_traits<Fn>::return_type;
   using PU = Parser<S, U>;
 
-  return {[=, unparser{std::move(unparser)}](auto stream) ->
-          typename PU::Result {
-            // all stream will be moved. The next state can be get from the
-            // returned Result type.
-
-            auto result = unparser(std::move(stream));
-            if (isOk(result)) {
-              auto &[stream1, _, val1] = std::get<Ok>(result);
-              return typename PU::Ok(std::move(stream1),
-                                     static_cast<U>(to_function<Fn>(f)(val1)));
-
-            } else {
-              auto &[stream1, _, err] = std::get<Error>(result);
-              return typename PU::Error(std::move(stream1), err);
-            }
-          }};
-} // namespace cppparsec
+  return {[=, unparser{std::move(unparser)}](
+              UnParserCallbacks cbs) -> typename PU::Result {
+    return unparser(
+        {.stream = std::move(cbs.stream),
+         .cok =
+             [=](InputStream stream, T val, ParserError err) {
+               return cbs.cok(std::forward(stream), std::forward(f(val)),
+                              std::forward<ParserError>(err));
+             },
+         .cerr = cbs.cerr,
+         .eok =
+             [=](InputStream stream, T val, ParserError err) {
+               return cbs.eok(std::forward(stream), std::forward(f(val)),
+                              std::forward<ParserError>(err));
+             },
+         .eerr = cbs.eerr});
+  }};
+}
 
 template <stream::stream_type S, typename T>
 template <typename U>
 auto Parser<S, T>::pure(U v) -> Parser<S, U> {
   using P = Parser<S, U>;
 
-  return {[=](auto stream) ->
-          typename P::Result { return typename P::Ok(std::move(stream), v); }};
+  return Parser<S, U>::mk_parsec([=](auto stream) -> typename P::Result {
+    return typename P::Ok(std::move(stream), v, {}, false);
+  });
 }
 
 template <stream::stream_type S, typename T>
@@ -278,27 +365,9 @@ auto Parser<S, T>::ap(Parser<S, function<U(T)>> fa) -> Parser<S, U> {
   using P = Parser<S, U>;
   using PFn = Parser<S, function<U(T)>>;
 
-  return {[=, unparser{std::move(unparser)}](auto stream) ->
-          typename P::Result {
-            // run fa to get the function.
-
-            auto fa_result = fa.unparser(std::move(stream));
-
-            if (PFn::isOk(fa_result)) {
-              auto &[stream1, _, f] = std::get<typename PFn::Ok>(fa_result);
-
-              // apply function to the result of unparser.
-              auto result1 = unparser(std::move(stream1));
-              auto &[stream2, _1, v1] = std::get<Ok>(result1);
-              return typename P::Ok(std::move(stream2), static_cast<U>(f(v1)));
-
-            } else {
-
-              auto &[stream1, _, e] = std::get<typename PFn::Error>(fa_result);
-              std::cout << e << std::endl;
-              return typename P::Error(std::move(stream1), e);
-            }
-          }};
+  // TODO
+  return P::make_parsec(
+);
 } // namespace cppparsec
 
 // fa * p
@@ -309,33 +378,48 @@ auto operator*(const Parser<S, function<U(T)>> &fa, Parser<S, T> &p)
 }
 
 template <stream::stream_type S, typename T>
-template <typename Fn>
+template <typename Fn, typename>
 auto Parser<S, T>::bind(Fn fma) -> typename function_traits<Fn>::return_type {
-  using P = typename function_traits<Fn>::return_type;
+  // fma: std::function<Parser(T)> TODO maybe add some constraints here.
 
-  return {
-      [=, unparser{std::move(unparser)}](auto stream) -> typename P::Result {
-        Result result = unparser(std::move(stream)); // run self
+  using PTo = typename function_traits<Fn>::return_type;
 
-        if (isOk(result)) {
-          auto &[stream1, _, v1] = std::get<Ok>(result);
+  return PTo{[=, unparser{std::move(unparser)}](
+                 UnParserCallbacks cbs) -> typename PTo::Result {
+    // consumed case
+    auto mcok = [=](InputStream stream, T val, ParserError err) {
+      return fma(val).unparser(
+          {.stream = std::move(stream),
 
-          // apply f to get a new parser.
-          P ma = fma(v1);
-          auto ma_result = ma.unparser(std::move(stream1));
+           // if fma consumes
+           .cok = cbs.cok,
+           .cerr = cbs.cerr,
 
-          if (decltype(ma)::isOk(ma_result)) {
-            return std::move(std::get<typename decltype(ma)::Ok>(ma_result));
+           // if fma doesn't consume, return the error in the error
+           // continuation.
+           .eok =
+               [=](InputStream stream, T val, ParserError err1) {
+                 return cbs.cok(std::move(stream), val, err1.merge(err));
+               },
+           .eerr =
+               [=](ParserError err1) { return cbs.cerr(err1.merge(err)); }});
+    };
 
-          } else {
-            return std::move(std::get<typename decltype(ma)::Error>(ma_result));
-          }
-
-        } else {
-          auto &[stream1, _, error] = std::get<Error>(result);
-          return typename P::Error(std::move(stream1), error);
-        }
-      }};
+    // empty case
+    auto meok = [=](InputStream stream, T val, ParserError err) {
+      return fma(val).unparser(
+          {.stream = std::move(stream),
+           .cok = cbs.cok,
+           .cerr = cbs.cerr,
+           .eok =
+               [=](InputStream stream, T val, ParserError err1) {
+                 return cbs.eok(std::move(stream), val, err1.merge(err));
+               },
+           .eerr =
+               [=](ParserError err1) { return cbs.eerr(err1.merge(err)); }});
+    };
+    return unparser(std::move(cbs.stream), mcok, cbs.cerr, meok, cbs.eerr);
+  }};
 }
 
 /*
@@ -362,7 +446,7 @@ auto Parser<S, T>::option(Parser<S, T> other) -> Parser<S, T> {
         return result1;
 
       } else { // failed on the second
-        auto &[stream1, _, e1] = std::get<P::Error>(result1);
+        auto &[stream1, e1, _] = std::get<P::Error>(result1);
         return Error(std::move(stream1), e1);
       }
     }
