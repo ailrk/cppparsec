@@ -9,78 +9,87 @@
 template <typename T>
 using P = cppparsec::Parser<cppparsec::stream::StringStream, T>;
 
-// // StrinStream
-// TEST_CASE("Create StrinStream", "StrinStream") {
-//   using namespace cppparsec::stream;
-//   StringStream s("abc\ndef\nghi\n");
+TEST_CASE() {}
 
-//   REQUIRE(s.get_col() == 1);
-//   REQUIRE(s.get_line() == 1);
-//   REQUIRE(!s.is_empty());
-//   REQUIRE(s.lookahead()->at(0) == 'a');
+// StrinStream
+TEST_CASE("Create StrinStream", "StrinStream") {
+  using namespace cppparsec::stream;
+  StringStream s("abc\ndef\nghi\n");
 
-//   SECTION("eat 1 token") {
-//     auto new_s = s.eat();
-//     REQUIRE(new_s->lookahead()->at(0) == 'b');
-//     REQUIRE(new_s->get_col() == 2);
-//     REQUIRE(new_s->get_line() == 1);
-//   }
+  REQUIRE(s.get_col() == 1);
+  REQUIRE(s.get_line() == 1);
+  REQUIRE(!s.is_empty());
+  REQUIRE(s.lookahead()->at(0) == 'a');
 
-//   SECTION("eat till the next line") {
-//     auto new_s = s.eat(5);
-//     REQUIRE(new_s->get_line() == 2);
-//     REQUIRE(new_s->get_col() == 2);
-//     REQUIRE(new_s->lookahead()->at(0) == 'e');
-//   }
+  SECTION("eat 1 token") {
+    auto new_s = s.eat();
+    REQUIRE(new_s->lookahead()->at(0) == 'b');
+    REQUIRE(new_s->get_col() == 2);
+    REQUIRE(new_s->get_line() == 1);
+  }
 
-//   SECTION("test StringStream copy constructor") {
-//     StringStream s1(s);
-//     StringStream s2 = s1;
-//     REQUIRE(s1.get_col() == s2.get_col());
-//     REQUIRE(s1.get_col() == s.get_col());
-//   }
+  SECTION("eat till the next line") {
+    auto new_s = s.eat(5);
+    REQUIRE(new_s->get_line() == 2);
+    REQUIRE(new_s->get_col() == 2);
+    REQUIRE(new_s->lookahead()->at(0) == 'e');
+  }
 
-//   SECTION("const expr test") {
-//     constexpr StringStream s1("abc\ndef\nghi\n");
-//     REQUIRE(s1.lookahead().value().at(0) == 'a');
-//   }
-// }
+  SECTION("test StringStream copy constructor") {
+    StringStream s1(s);
+    StringStream s2 = s1;
+    REQUIRE(s1.get_col() == s2.get_col());
+    REQUIRE(s1.get_col() == s.get_col());
+  }
 
-// TEST_CASE("Simple parser test") {
-//   using namespace cppparsec;
-//   using namespace cppparsec::stream;
+  SECTION("const expr test") {
+    constexpr StringStream s1("abc\ndef\nghi\n");
+    REQUIRE(s1.lookahead().value().at(0) == 'a');
+  }
+}
 
-//   auto s = std::make_unique<StringStream>("abc\ndef\nghi\n");
+TEST_CASE("Simple parser test") {
+  using namespace cppparsec;
+  using namespace cppparsec::stream;
 
-//   P<int> p([](P<int>::InputStream stream) -> P<int>::Result {
-//     return P<int>::Ok(std::move(stream), 1);
-//   });
+  auto s = std::make_unique<StringStream>("abc\ndef\nghi\n");
 
-//   SECTION("test copy Parser construtors") {
-//     // make sure they are accessible.
-//     decltype(p) p1(p);
-//     decltype(p) p2 = p1;
-//   }
+  // P<int> p([](P<int>::UnParserCallbacks cbs) -> P<int>::Result {
+  //   return P<int>::Ok(std::move(cbs.stream), 1);
+  // });
 
-//   SECTION("run parser") {
-//     auto result = p.unparser(std::move(s));
-//     auto &[s1, _, v] = std::get<decltype(p)::Ok>(result);
-//     REQUIRE(v == 1);
-//   }
+  P<int> p =
+      P<int>::mk_parsec([](P<int>::InputStream stream) -> P<int>::Result {
+        return P<int>::Ok(std::move(stream), 1);
+      });
 
-//   SECTION("run") {
-//     auto v = p.run(std::move(s));
-//     REQUIRE(v == 1);
-//   }
+  SECTION("test copy Parser construtors") {
+    // make sure they are accessible.
+    decltype(p) p1(p);
+    decltype(p) p2 = p1;
+  }
 
-//   SECTION("more compelx run") {
-//     auto v = p.map([](int v) -> double {
-//                 return v + 1.1;
-//                 ;
-//               }).run(std::move(s));
-//     REQUIRE(v == 2.1);
-//   }
-// }
+  SECTION("run parser") {
+    auto result = p.run_parsec(std::move(s));
+    auto &[s1, v, err, consumed] = std::get<decltype(p)::Ok>(result);
+    REQUIRE(v.value() == 1);
+  }
+
+  // SECTION("run") {
+  //   auto v = p.run(std::move(s));
+  //   REQUIRE(v == 1);
+  // }
+
+  SECTION("more compelx run") {
+    auto result = p.map([](int v) -> double {
+                return v + 1.1;
+                ;
+              }).run_parsec(std::move(s));
+    auto &[s1, v, err, consumed] = std::get<decltype(p)::Ok>(result);
+    std::cout << v.value() << std::endl;
+    //REQUIRE(v == 2.1);
+  }
+}
 
 // // monadic parser
 // TEST_CASE("Test Monadic Parser", "monadic parser") {
@@ -291,7 +300,8 @@ using P = cppparsec::Parser<cppparsec::stream::StringStream, T>;
 //     // should consume a, then fail.
 //     auto pp = ch('a') >> ch('d');
 //     auto p1 = attempt(pp);
-//     auto [s1, _, _1] = std::get<decltype(p1)::Error>(p1.unparser(std::move(s)));
+//     auto [s1, _, _1] =
+//     std::get<decltype(p1)::Error>(p1.unparser(std::move(s)));
 //     REQUIRE(s1->lookahead().value() == "abc\ndef\nghi\n");
 //   }
 
