@@ -122,24 +122,8 @@ public:
     };
   }
 
-  template <typename F, typename U = typename parser_trait<
-                            typename function_traits<F>::return_type>::Ret>
-  inline Parser<S, U> bind(const F &fn) {
-    return [=](State<S> state, Pack<S, T> pack) {
-      Pack<S, T> pack1 = {.cok =
-                              [=](T a, State<S> s, ParseError err) {
-
-                              },
-                          .cerr =
-                              [=](ParseError err) {
-
-                              },
-                          .eok = pack.eok,
-                          .eerr = pack.eerr};
-
-      return ps(state, pack1);
-    };
-  }
+  template <typename F, typename U = typename function_traits<F>::Ret::Ret>
+  inline Parser<S, U> bind(F fn) {}
 };
 
 // unwrap the type

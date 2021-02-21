@@ -16,6 +16,9 @@ public:
     std::string text;
 
     const std::string &to_string() const { return text; }
+
+    Message(Error error_kind, std::string text)
+        : error_kind(error_kind), text(text) {}
   };
 
 private:
@@ -46,6 +49,22 @@ public:
     } else {
       return e2;
     }
+  }
+
+  static Message message_error(const std::string &message) {
+    return Message(Error::Message, message);
+  }
+
+  static Message unexpect_error(const std::string &message) {
+    return Message(Error::UnExpect, message);
+  }
+
+  static Message expect_error(const std::string &message) {
+    return Message(Error::Expect, message);
+  }
+
+  static Message sys_unexpect_error(const std::string &message) {
+    return Message(Error::SysUnExpect, message);
   }
 
   void set_position(Position pos) { position = pos; }
