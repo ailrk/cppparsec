@@ -4,6 +4,7 @@
 #include "util.h"
 #include <cassert>
 #include <concepts>
+#include <functional>
 #include <optional>
 #include <type_traits>
 #include <vector>
@@ -31,16 +32,16 @@ template <stream::stream_type S, typename T> struct Reply {
 };
 
 template <stream::stream_type S, typename T>
-using ConsumedOkFn = auto (*)(T, State<S>, ParseError) -> Reply<S, T>;
+using ConsumedOkFn = std::function<Reply<S, T>(T, State<S>, ParseError)>;
 
 template <stream::stream_type S, typename T>
-using ConsumedErrorFn = auto (*)(ParseError) -> Reply<S, T>;
+using ConsumedErrorFn = std::function<Reply<S, T>(ParseError)>;
 
 template <stream::stream_type S, typename T>
-using EmptyOkFn = auto (*)(T, State<S>, ParseError) -> Reply<S, T>;
+using EmptyOkFn = std::function<Reply<S, T>(T, State<S>, ParseError)>;
 
 template <stream::stream_type S, typename T>
-using EmptyErrorFn = auto (*)(ParseError) -> Reply<S, T>;
+using EmptyErrorFn = std::function<Reply<S, T>(ParseError)>;
 
 template <stream::stream_type S, typename T> struct Pack {
   ConsumedOkFn<S, T> cok;
@@ -125,17 +126,31 @@ public:
   template <typename F, typename U = typename parser_trait<
                             typename function_traits<F>::return_type>::Ret>
   inline Parser<S, U> bind(const F &fn) {
-    return [=](State<S> state, Pack<S, T> pack) {
-      Pack<S, T> pack1 = {.cok =
-                              [=](T a, State<S> s, ParseError err) {
+    return [&](State<S> state, Pack<S, T> pack) {
+      Pack<S, T> pack1 = {
+          .cok =
+              [=](T a, State<S> s, ParseError err) {
+                auto peok = [&](auto... params, auto err1) {
+                  return pack.cok(params..., err + err1);
+                };
 
-                              },
-                          .cerr =
-                              [=](ParseError err) {
+                auto peerr = [&](auto err1) { return pack.cerr(err + err1); };
 
-                              },
-                          .eok = pack.eok,
-                          .eerr = pack.eerr};
+                return fn(a).ps(state,
+                                Pack<S, T>(pack.cok, pack.cerr, peok, perror));
+              },
+          .eok =
+              [=](T a, State<S> s, ParseError err) {
+                auto peok = [&](auto... params, auto err1) {
+                  return pack.eok(params..., err + err1);
+                };
+                auto peerr = [&](auto err1) { return pack.eerr(err + err1); };
+
+                return fn(a).ps(state,
+                                Pack<S, T>(pack.cok, pack.cerr, peok, perror));
+              },
+          .cerr = pack.eok,
+          .eerr = pack.eerr};
 
       return ps(state, pack1);
     };
