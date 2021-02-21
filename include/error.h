@@ -89,9 +89,8 @@ public:
   }
 };
 
-template <stream::stream_type S, typename T>
-ParseError unknown_error(State<S> state) {
-  return ParseError(state, ParseError::Message(state.position, {}));
+template <stream::state_type S> ParseError unknown_error(S state) {
+  return ParseError(state.get_position(), {});
 }
 
 } // namespace cppparsec

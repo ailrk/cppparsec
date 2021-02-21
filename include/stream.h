@@ -34,7 +34,8 @@ namespace stream {
 
 // template <typename T> concept stream_type = is_stream<T>::value;
 
-template <typename T> concept stream_type = requires(T t) {
+template <typename T> concept state_type = requires(T t) {
+
   { t.get_line() }
   ->std::convertible_to<size_t>;
 
@@ -44,7 +45,7 @@ template <typename T> concept stream_type = requires(T t) {
   { t.lookahead() }
   ->std::convertible_to<std::optional<typename T::DataType>>;
 
-  { t.get_pos() }
+  { t.get_position() }
   ->std::same_as<Position>;
 
   { t.eat() }
@@ -57,27 +58,28 @@ template <typename T> concept stream_type = requires(T t) {
 /*
  * Stream type for string_view.
  */
-class StringStream {
+class StringState {
 
   std::string_view data;
-  mutable Position position;
+  Position position;
 
 public:
+
   // update stream, return a new String Stream.
   // note because it just pass a string view, copy cost almost nothing.
   using DataType = std::string_view;
-  constexpr StringStream(const std::string_view &s, const Position &pos)
+  constexpr StringState(const std::string_view &s, const Position &pos)
       : data(s), position(pos) {}
 
-  constexpr StringStream(std::string_view s)
+  constexpr StringState(std::string_view s)
       : data(s), position(Position{1, 1}) {}
 
   // copy the string stream with the same state.
   // Thisis essential for retrying.
-  constexpr StringStream(const StringStream &stream)
+  constexpr StringState(const StringState &stream)
       : data(stream.data), position(stream.position) {}
 
-  constexpr StringStream &operator=(const StringStream &stream) {
+  constexpr StringState &operator=(const StringState &stream) {
     data = stream.data;
     position = stream.position;
     return *this;
@@ -86,26 +88,26 @@ public:
   constexpr bool is_empty() const;
   constexpr size_t get_line() const;
   constexpr size_t get_col() const;
-  constexpr Position get_pos() const;
+  constexpr Position get_position() const;
   constexpr const std::optional<const std::string_view> lookahead() const;
 
-  std::unique_ptr<StringStream> eat(size_t n) const;
-  std::unique_ptr<StringStream> eat() const;
+  std::unique_ptr<StringState> eat(size_t n) const;
+  std::unique_ptr<StringState> eat() const;
 };
 
-constexpr bool StringStream::is_empty() const { return data.size() == 0; }
+constexpr bool StringState::is_empty() const { return data.size() == 0; }
 
-constexpr size_t StringStream::get_line() const { return position.line; };
+constexpr size_t StringState::get_line() const { return position.line; };
 
-constexpr size_t StringStream::get_col() const { return position.col; };
+constexpr size_t StringState::get_col() const { return position.col; };
 
-constexpr Position StringStream::get_pos() const { return position; }
+constexpr Position StringState::get_position() const { return position; }
 
 /*
  * Return the underlying string view.
  */
 constexpr const std::optional<const std::string_view>
-StringStream::lookahead() const {
+StringState::lookahead() const {
   if (is_empty()) {
     return {};
   }
@@ -116,15 +118,15 @@ StringStream::lookahead() const {
  * Eat the next n tokens, and return a new StringStream with
  * updated position.
  */
-std::unique_ptr<StringStream> StringStream::eat(size_t n) const {
-  return std::make_unique<StringStream>(data.substr(n), [=]() {
+std::unique_ptr<StringState> StringState::eat(size_t n) const {
+  return std::make_unique<StringState>(data.substr(n), [&]() {
     if (is_empty()) {
       return position;
     }
 
     Position new_position = position;
 
-    for (int i = 0; i < n; ++i) {
+    for (size_t i = 0; i < n; ++i) {
       if (data[i] == '\n') {
         new_position.line++;
         new_position.col = 1;
@@ -136,12 +138,7 @@ std::unique_ptr<StringStream> StringStream::eat(size_t n) const {
   }());
 };
 
-std::unique_ptr<StringStream> StringStream::eat() const { return eat(1); }
+std::unique_ptr<StringState> StringState::eat() const { return eat(1); }
 } // namespace stream
-
-template <stream::stream_type S> struct State {
-  Position position;
-  S stream;
-};
 
 } // namespace cppparsec

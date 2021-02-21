@@ -1,5 +1,9 @@
 #pragma once
+#include <any>
 #include <functional>
+#include <utility>
+
+namespace cppparsec::util {
 
 template <typename T> struct function_traits_impl { using type = void; };
 template <typename Ret, typename Class, typename... Args>
@@ -19,3 +23,8 @@ template <typename F> struct function_traits {
   using return_type =
       typename function_traits_impl<decltype(&F::operator())>::return_type;
 };
+
+auto const_(auto a) {
+  return [=](auto b) { return a; };
+}
+} // namespace cppparsec::util

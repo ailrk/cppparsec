@@ -447,6 +447,6 @@ auto Parser<S, T>::option(Parser<S, T> other) -> Parser<S, T> {
 }
 
 // shorhand for string parser.
-template <typename T> using SP = Parser<stream::StringStream, T>;
+template <typename T> using SP = Parser<stream::StringState, T>;
 
 } // namespace cppparsec
