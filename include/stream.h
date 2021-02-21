@@ -17,6 +17,10 @@ struct Position {
     return (p1.line < p2.line) || (p1.col < p2.col);
   }
 
+  [[nodiscard]] friend bool operator>(const Position &p1, const Position &p2) {
+    return (p1.line > p2.line) || (p1.col > p2.col);
+  }
+
   [[nodiscard]] friend bool operator==(const Position &p1, const Position &p2) {
     return p1.col == p2.col && p1.line == p2.line;
   }
@@ -134,5 +138,10 @@ std::unique_ptr<StringStream> StringStream::eat(size_t n) const {
 
 std::unique_ptr<StringStream> StringStream::eat() const { return eat(1); }
 } // namespace stream
+
+template <stream::stream_type S> struct State {
+  Position position;
+  S stream;
+};
 
 } // namespace cppparsec
