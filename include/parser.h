@@ -34,6 +34,8 @@ public:
     return *this;
   }
 
+  // smart constructors to avoid invalid state.
+
   static Reply<S, T> make_cok_reply(T value, S state, ParseError error) {
     return {true, true, {value}, state, error};
   }
@@ -43,7 +45,6 @@ public:
   }
 
   static Reply<S, T> make_eok_reply(T value, S state, ParseError error) {
-    std::cout << "in eok: " << value << std::endl;
     return {false, true, {value}, state, error};
   }
 
@@ -72,10 +73,10 @@ template <stream::state_type S, typename T> struct Pack {
 };
 
 template <typename T> struct parser_trait {
-  using R = typename T::R;
-  using PS = typename T::PS;
-  using State = typename T::State;
-  using V = typename T::V;
+  using R = typename T::R;         // Reply
+  using State = typename T::State; // State
+  using V = typename T::V;         // Return Value
+  using PS = typename T::PS;       // The Parser
 };
 
 template <stream::state_type S, typename T> class Parser {
@@ -99,20 +100,15 @@ public:
   template <typename Fn, typename U = typename function_traits<Fn>::return_type>
   Parser<S, U> map(const Fn &fn) {
     static_assert(std::is_convertible_v<Fn, std::function<U(T)>>);
-    std::cout << "creating map" << std::endl;
 
-    return Parser([=, ps{std::move(ps)}](S state, Pack<S, T> pack) {
+    return Parser([&, ps = ps](S state, Pack<S, T> pack) {
       return ps(state, {.cok =
                             [&](T value, auto... params) {
-                              auto v1 = fn(value);
-                              std::cout << "cok: " << v1 << std::endl;
                               return pack.cok(fn(value), params...);
                             },
                         .cerr = pack.cerr,
                         .eok =
                             [&](T value, auto... params) {
-                              auto v1 = fn(value);
-                              std::cout << "eok: " << v1 << std::endl;
                               return pack.eok(fn(value), params...);
                             },
                         .eerr = pack.eerr});
@@ -136,31 +132,43 @@ public:
   template <typename F, typename U = typename parser_trait<
                             typename function_traits<F>::return_type>::V>
   inline Parser<S, U> bind(const F &fn) {
-    return [&](S state, Pack<S, T> pack) {
-      Pack<S, T> pack1 = {
-          .cok =
-              [=](T a, S s, ParseError err) {
-                auto peok = [&](auto... params, auto err1) {
-                  return pack.cok(params..., err + err1);
-                };
+    static_assert(std::is_convertible_v<F, std::function<Parser<S, U>(T)>>);
 
-                auto peerr = [&](auto err1) { return pack.cerr(err + err1); };
+    auto make_peok = [&](Pack<S, T> pack, ParseError err) {
+      return [&](T value, S s, ParseError err1) {
+        return pack.cok(value, s, err + err1);
+      };
+    };
 
-                return fn(a).ps(state,
-                                Pack<S, T>(pack.cok, pack.cerr, peok, perror));
-              },
-          .eok =
-              [=](T a, S s, ParseError err) {
-                auto peok = [&](auto... params, auto err1) {
-                  return pack.eok(params..., err + err1);
-                };
-                auto peerr = [&](auto err1) { return pack.eerr(err + err1); };
+    auto make_peerr = [&](Pack<S, T> pack, ParseError err) {
+      return
+          [&](T value, S s, ParseError err1) { return pack.cerr(err + err1); };
+    };
 
-                return fn(a).ps(state,
-                                Pack<S, T>(pack.cok, pack.cerr, peok, perror));
-              },
-          .cerr = pack.eok,
-          .eerr = pack.eerr};
+    return [&, ps = ps](S state, Pack<S, T> pack) {
+      Pack<S, T> pack1 = {.cok =
+                              [=](T a, S s, ParseError err) {
+                                auto peok = make_peok(pack, err);
+                                auto peerr = make_peerr(pack, err);
+
+                                Pack<S, T> p(pack.cok, pack.cerr, peok, peerr);
+
+                                return fn(a).ps(state, p);
+                              },
+
+                          .cerr = pack.cerr,
+
+                          .eok =
+                              [=](T a, S s, ParseError err) {
+                                auto peok = make_peok(pack, err);
+                                auto peerr = make_peerr(pack, err);
+
+                                Pack<S, T> p(pack.cok, pack.cerr, peok, peerr);
+
+                                return fn(a).ps(state, p);
+                              },
+
+                          .eerr = pack.eerr};
 
       return ps(state, pack1);
     };
@@ -217,28 +225,24 @@ template <typename P, typename Fn> P make_parser(const Fn &go) {
   });
 }
 
-// Simply unwrap the parser. This function is usually at the end of cps chain.
+// Simply unwrap the parser. This function is usually at the end of chain call.
 template <stream::state_type S, typename T>
 typename Parser<S, T>::R Parser<S, T>::run_parser(S state) {
 
   Pack<S, T> pack;
   pack.cok = [&](T value, S state, ParseError error) {
-    std::cout << "co" << std::endl;
     return R::make_cok_reply(value, state, error);
   };
 
   pack.cerr = [&](ParseError error) {
-    std::cout << "ce" << std::endl;
     return R::make_cerr_reply(state, error);
   };
 
   pack.eok = [&](T value, S, ParseError error) {
-    std::cout << "eo" << std::endl;
     return R::make_eok_reply(value, state, error);
   };
 
   pack.eerr = [&](ParseError error) {
-    std::cout << "ee" << std::endl;
     return R::make_eerr_reply(state, error);
   };
 
