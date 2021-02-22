@@ -102,16 +102,17 @@ public:
     static_assert(std::is_convertible_v<Fn, std::function<U(T)>>);
 
     return Parser([&fn, ps = ps](S state, Pack<S, T> pack) {
-      return ps(state, {.cok =
-                            [&](T value, auto... params) {
-                              return pack.cok(fn(value), params...);
-                            },
-                        .cerr = pack.cerr,
-                        .eok =
-                            [&](T value, auto... params) {
-                              return pack.eok(fn(value), params...);
-                            },
-                        .eerr = pack.eerr});
+      auto pcok = [&](T value, auto... params) {
+        return pack.cok(fn(value), params...);
+      };
+
+      auto peok = [&](T value, auto... params) {
+        return pack.eok(fn(value), params...);
+      };
+
+      return ps(
+          state,
+          {.cok = pcok, .cerr = pack.cerr, .eok = peok, .eerr = pack.eerr});
     });
   }
 
@@ -145,29 +146,26 @@ public:
     };
 
     return Parser([&, ps = ps](S state, Pack<S, T> pack) {
-      Pack<S, T> pack1{.cok =
-                           [&, ps = ps](T a, S s, ParseError err) {
-                             auto peok = make_peok(pack, err);
-                             auto peerr = make_peerr(pack, err);
+      auto pcok = [&, ps = ps](T a, S s, ParseError err) {
+        auto peok = make_peok(pack, err);
+        auto peerr = make_peerr(pack, err);
 
-                             Pack<S, T> p(pack.cok, pack.cerr, peok, peerr);
+        Pack<S, T> p(pack.cok, pack.cerr, peok, peerr);
 
-                             return fn(a).ps(state, p);
-                           },
+        return fn(a).ps(state, p);
+      };
 
-                       .cerr = pack.cerr,
+      auto peok = [&, ps = ps](T a, S s, ParseError err) {
+        auto peok = make_peok(pack, err);
+        auto peerr = make_peerr(pack, err);
 
-                       .eok =
-                           [&, ps = ps](T a, S s, ParseError err) {
-                             auto peok = make_peok(pack, err);
-                             auto peerr = make_peerr(pack, err);
+        Pack<S, T> p(pack.cok, pack.cerr, peok, peerr);
 
-                             Pack<S, T> p(pack.cok, pack.cerr, peok, peerr);
+        return fn(a).ps(state, p);
+      };
 
-                             return fn(a).ps(state, p);
-                           },
-
-                       .eerr = pack.eerr};
+      Pack<S, T> pack1{
+          .cok = pcok, .cerr = pack.cerr, .eok = peok, .eerr = pack.eerr};
 
       return ps(state, pack1);
     });

@@ -205,16 +205,4 @@ TEST_CASE("bind") {
     auto r = p1.run_parser(s);
     REQUIRE(r.value.value() == 'x');
   }
-
-  SECTION("bind 4", "sequence") {
-    // TODO >> doesn't work yet
-
-    auto p = P::pure('a');
-    auto q = P::pure('b');
-
-    auto p1 = p >>= [q{std::move(q)}](char _) { return q; };
-
-    auto r = p1.run_parser(s);
-    REQUIRE(r.value.value() == 'b');
-  }
 }

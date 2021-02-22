@@ -16,9 +16,9 @@ constexpr auto attempt(Parser<S, T> p) -> Parser<S, T>;
 
 } // namespace cppparsec::combinator
 
-namespace cppparsec {
+// namespace cppparsec {
 // generic combinators
-namespace comb {
+// namespace comb {
 // // try a parser. if failed and consumed token, rewind back as it
 // // haven't consume
 // // This is the only case you want to copy the stream.
