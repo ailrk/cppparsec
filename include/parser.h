@@ -98,10 +98,10 @@ public:
   R operator()();
 
   template <typename Fn, typename U = typename function_traits<Fn>::return_type>
-  Parser<S, U> map(const Fn &fn) {
+  Parser<S, U> map(const Fn &fn) const {
     static_assert(std::is_convertible_v<Fn, std::function<U(T)>>);
 
-    return Parser([&, ps = ps](S state, Pack<S, T> pack) {
+    return Parser([&fn, ps = ps](S state, Pack<S, T> pack) {
       return ps(state, {.cok =
                             [&](T value, auto... params) {
                               return pack.cok(fn(value), params...);
@@ -122,7 +122,7 @@ public:
     });
   }
 
-  inline Parser<S, T> fail(const std::string &message) {
+  inline Parser<S, T> fail(const std::string &message) const {
     return [&](S state, Pack<S, T> pack) {
       auto err = ParseError::message_error(message);
       return pack.eerr(ParseError(state.position, {err}));
@@ -131,58 +131,57 @@ public:
 
   template <typename F, typename U = typename parser_trait<
                             typename function_traits<F>::return_type>::V>
-  inline Parser<S, U> bind(const F &fn) {
+  inline Parser<S, U> bind(const F &fn) const {
     static_assert(std::is_convertible_v<F, std::function<Parser<S, U>(T)>>);
 
-    auto make_peok = [&](Pack<S, T> pack, ParseError err) {
+    auto make_peok = [](const Pack<S, T> &pack, const ParseError &err) {
       return [&](T value, S s, ParseError err1) {
         return pack.cok(value, s, err + err1);
       };
     };
 
-    auto make_peerr = [&](Pack<S, T> pack, ParseError err) {
-      return
-          [&](T value, S s, ParseError err1) { return pack.cerr(err + err1); };
+    auto make_peerr = [](const Pack<S, T> &pack, const ParseError &err) {
+      return [&](ParseError err1) { return pack.cerr(err + err1); };
     };
 
-    return [&, ps = ps](S state, Pack<S, T> pack) {
-      Pack<S, T> pack1 = {.cok =
-                              [=](T a, S s, ParseError err) {
-                                auto peok = make_peok(pack, err);
-                                auto peerr = make_peerr(pack, err);
+    return Parser([&, ps = ps](S state, Pack<S, T> pack) {
+      Pack<S, T> pack1{.cok =
+                           [&, ps = ps](T a, S s, ParseError err) {
+                             auto peok = make_peok(pack, err);
+                             auto peerr = make_peerr(pack, err);
 
-                                Pack<S, T> p(pack.cok, pack.cerr, peok, peerr);
+                             Pack<S, T> p(pack.cok, pack.cerr, peok, peerr);
 
-                                return fn(a).ps(state, p);
-                              },
+                             return fn(a).ps(state, p);
+                           },
 
-                          .cerr = pack.cerr,
+                       .cerr = pack.cerr,
 
-                          .eok =
-                              [=](T a, S s, ParseError err) {
-                                auto peok = make_peok(pack, err);
-                                auto peerr = make_peerr(pack, err);
+                       .eok =
+                           [&, ps = ps](T a, S s, ParseError err) {
+                             auto peok = make_peok(pack, err);
+                             auto peerr = make_peerr(pack, err);
 
-                                Pack<S, T> p(pack.cok, pack.cerr, peok, peerr);
+                             Pack<S, T> p(pack.cok, pack.cerr, peok, peerr);
 
-                                return fn(a).ps(state, p);
-                              },
+                             return fn(a).ps(state, p);
+                           },
 
-                          .eerr = pack.eerr};
+                       .eerr = pack.eerr};
 
       return ps(state, pack1);
-    };
+    });
   }
 
   template <typename F, typename U = typename parser_trait<
                             typename function_traits<F>::return_type>::V>
-  inline friend Parser<S, U> operator>>=(const Parser<S, T> p, const F &fn) {
+  inline friend Parser<S, U> operator>>=(const Parser<S, T> &p, const F &fn) {
     return p.bind(fn);
   }
 
   template <typename F, typename U = typename parser_trait<
                             typename function_traits<F>::return_type>::V>
-  inline friend Parser<S, U> operator>>(const Parser<S, T> p,
+  inline friend Parser<S, U> operator>>(const Parser<S, T> &p,
                                         const Parser<S, U> &q) {
     return p.bind([&](auto _) { return q; });
   }

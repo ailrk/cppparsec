@@ -136,8 +136,85 @@ TEST_CASE("bind") {
 
   SECTION("bind 1") {
     auto p = P::pure('a');
-    auto r = p.bind([](char v) { return P::pure('c'); }).run_parser(s);
-    std::cout << r.value.value() << std::endl;
+    auto r = p.bind([](char v) {
+                if (v == 'c') {
+
+                  return P::pure('c');
+                } else {
+                  return P::pure('x');
+                }
+              }).run_parser(s);
+    REQUIRE(r.value.value() == 'x');
   }
 
+  SECTION("bind 2", "lifetime check 1, intermidiate") {
+    auto p = P::pure('a');
+    auto p1 = p.bind([](char v) {
+                 if (v == 'a') {
+                   return P::pure('c');
+                 } else {
+                   return P::pure('x');
+                 }
+               }).bind([](char v) {
+      if (v == 'c') {
+        return P::pure('x');
+
+      } else
+        return P::pure('z');
+    });
+    auto r = p1.run_parser(s);
+
+    REQUIRE(r.value.value() == 'x');
+  }
+
+  SECTION("bind 3", "lifetime check 2, move resilience") {
+    auto p = P::pure('a');
+    auto p1 = p.bind([](char v) {
+      if (v == 'a') {
+        return P::pure('c');
+      } else {
+        return P::pure('x');
+      }
+    });
+    auto p2 = p1.bind([](char v) {
+      if (v == 'c') {
+        return P::pure('x');
+      } else
+        return P::pure('z');
+    });
+    auto r = p2.run_parser(s);
+
+    REQUIRE(r.value.value() == 'x');
+  }
+
+  SECTION("bind 4", "test operator") {
+    auto p = P::pure('a');
+    auto p1 = (p >>= [](char v) {
+      if (v == 'a') {
+        return P::pure('c');
+      } else {
+        return P::pure('x');
+      }
+    }) >>= ([](char v) {
+      if (v == 'c') {
+        return P::pure('x');
+      } else
+        return P::pure('z');
+    });
+
+    auto r = p1.run_parser(s);
+    REQUIRE(r.value.value() == 'x');
+  }
+
+  SECTION("bind 4", "sequence") {
+    // TODO >> doesn't work yet
+
+    auto p = P::pure('a');
+    auto q = P::pure('b');
+
+    auto p1 = p >>= [q{std::move(q)}](char _) { return q; };
+
+    auto r = p1.run_parser(s);
+    REQUIRE(r.value.value() == 'b');
+  }
 }

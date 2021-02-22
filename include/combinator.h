@@ -10,11 +10,15 @@
 #include <string>
 #include <vector>
 
-// namespace cppparsec {
+namespace cppparsec::combinator {
+template <stream::state_type S, typename T>
+constexpr auto attempt(Parser<S, T> p) -> Parser<S, T>;
 
-// // generic combinators
-// namespace comb {
+} // namespace cppparsec::combinator
 
+namespace cppparsec {
+// generic combinators
+namespace comb {
 // // try a parser. if failed and consumed token, rewind back as it
 // // haven't consume
 // // This is the only case you want to copy the stream.
