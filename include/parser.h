@@ -65,6 +65,7 @@ using EmptyOkFn = std::function<Reply<S, T>(T, S, ParseError)>;
 template <stream::state_type S, typename T>
 using EmptyErrorFn = std::function<Reply<S, T>(ParseError)>;
 
+
 template <stream::state_type S, typename T> struct Pack {
   ConsumedOkFn<S, T> cok;
   ConsumedErrorFn<S, T> cerr;
