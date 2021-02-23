@@ -135,6 +135,7 @@ TEST_CASE("bind") {
   StringState s("abc\ndef\nghi\n");
 
   SECTION("bind 1") {
+
     auto p = P::pure('a');
     auto r = p.bind([](char v) {
                 if (v == 'c') {
@@ -205,4 +206,53 @@ TEST_CASE("bind") {
     auto r = p1.run_parser(s);
     REQUIRE(r.value.value() == 'x');
   }
+
+  SECTION("bind 5", "test bind by external reference") {
+    auto p = P::pure('a');
+    auto q = P::pure('b');
+    auto h = P::pure('h');
+
+    auto r1 = (p >>= [&](char v) {
+                if (v == 'a') {
+                  return q;
+                } else {
+                  return h;
+                }
+              }).run_parser(s);
+
+    // for this to work we capture everything in bind.
+    // there might be more opportunity for optmization.
+    auto p1 = p >>= [=](char v) {
+      if (v == 'a') {
+        auto q1 = q;
+        return q1;
+      } else {
+        auto h1 = h;
+        return h1;
+      }
+    };
+
+    auto r2 = p1.run_parser(s);
+
+    REQUIRE(r1.value.value() == 'b');
+    REQUIRE(r2.value.value() == 'b');
+  }
+
+  SECTION("bind 5", "sequence") {
+    auto p = P::pure('a');
+    auto q = P::pure('b');
+    auto h = P::pure('c');
+
+    auto p1 = (p >> q);
+    auto p2 = p1 >> h;
+    auto r = p2.run_parser(s);
+    REQUIRE(r.value.value() == 'c');
+  }
+}
+
+TEST_CASE("applicative") {
+  SECTION("ap", "ap 1") {
+
+  }
+
 }

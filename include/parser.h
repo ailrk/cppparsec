@@ -65,7 +65,6 @@ using EmptyOkFn = std::function<Reply<S, T>(T, S, ParseError)>;
 template <stream::state_type S, typename T>
 using EmptyErrorFn = std::function<Reply<S, T>(ParseError)>;
 
-
 template <stream::state_type S, typename T> struct Pack {
   ConsumedOkFn<S, T> cok;
   ConsumedErrorFn<S, T> cerr;
@@ -93,10 +92,18 @@ private:
 
 public:
   Parser(const PS &ps) : ps(ps) {}
+  Parser(const Parser &parsre) = default;
+  Parser(Parser &&parsre) = default;
 
   R run_parser(S state);
 
   R operator()();
+
+  std::string to_string() const {
+    char buf[124];
+    sprintf(buf, "<Parser at %p, ps at %p>", this, &ps);
+    return std::string(buf);
+  }
 
   template <typename Fn, typename U = typename function_traits<Fn>::return_type>
   Parser<S, U> map(const Fn &fn) const {
@@ -131,10 +138,10 @@ public:
     };
   }
 
-  template <typename F, typename U = typename parser_trait<
-                            typename function_traits<F>::return_type>::V>
-  inline Parser<S, U> bind(const F &fn) const {
-    static_assert(std::is_convertible_v<F, std::function<Parser<S, U>(T)>>);
+  template <typename Fn, typename U = typename parser_trait<
+                             typename function_traits<Fn>::return_type>::V>
+  inline Parser<S, U> bind(const Fn &fn) const {
+    static_assert(std::is_convertible_v<Fn, std::function<Parser<S, U>(T)>>);
 
     auto make_peok = [](const Pack<S, T> &pack, const ParseError &err) {
       return [&](T value, S s, ParseError err1) {
@@ -146,8 +153,8 @@ public:
       return [&](ParseError err1) { return pack.cerr(err + err1); };
     };
 
-    return Parser([&, ps = ps](S state, Pack<S, T> pack) {
-      auto pcok = [&, ps = ps](T a, S s, ParseError err) {
+    return Parser([=, this](S state, Pack<S, T> pack) {
+      auto pcok = [=](T a, S s, ParseError err) {
         auto peok = make_peok(pack, err);
         auto peerr = make_peerr(pack, err);
 
@@ -156,7 +163,7 @@ public:
         return fn(a).ps(state, p);
       };
 
-      auto peok = [&, ps = ps](T a, S s, ParseError err) {
+      auto peok = [=](T a, S s, ParseError err) {
         auto peok = make_peok(pack, err);
         auto peerr = make_peerr(pack, err);
 
@@ -178,11 +185,10 @@ public:
     return p.bind(fn);
   }
 
-  template <typename F, typename U = typename parser_trait<
-                            typename function_traits<F>::return_type>::V>
+  template <typename U>
   inline friend Parser<S, U> operator>>(const Parser<S, T> &p,
                                         const Parser<S, U> &q) {
-    return p.bind([&](auto _) { return q; });
+    return p.bind([&](T _) { return q; });
   }
 
   template <typename F, typename U = typename function_traits<F>::return_type>
