@@ -97,6 +97,7 @@ TEST_CASE("prim ops") {
   using namespace cppparsec;
   using namespace cppparsec::stream;
   using P = Parser<StringState, char>;
+  using PI = Parser<StringState, int>;
   StringState s("abc\ndef\nghi\n");
 
   SECTION("test map 1") {
@@ -126,133 +127,197 @@ TEST_CASE("prim ops") {
     auto r = p1.run_parser(s);
     REQUIRE(r.value.value() == 'c');
   }
-}
 
-TEST_CASE("bind") {
-  using namespace cppparsec;
-  using namespace cppparsec::stream;
-  using P = Parser<StringState, char>;
-  StringState s("abc\ndef\nghi\n");
-
-  SECTION("bind 1") {
-
+  SECTION("test map 4", "map to different type") {
     auto p = P::pure('a');
-    auto r = p.bind([](char v) {
-                if (v == 'c') {
-
-                  return P::pure('c');
-                } else {
-                  return P::pure('x');
-                }
-              }).run_parser(s);
-    REQUIRE(r.value.value() == 'x');
-  }
-
-  SECTION("bind 2", "lifetime check 1, intermidiate") {
-    auto p = P::pure('a');
-    auto p1 = p.bind([](char v) {
-                 if (v == 'a') {
-                   return P::pure('c');
-                 } else {
-                   return P::pure('x');
-                 }
-               }).bind([](char v) {
-      if (v == 'c') {
-        return P::pure('x');
-
-      } else
-        return P::pure('z');
-    });
+    PI p1 = p.map([](char _) { return 1;});
     auto r = p1.run_parser(s);
-
-    REQUIRE(r.value.value() == 'x');
-  }
-
-  SECTION("bind 3", "lifetime check 2, move resilience") {
-    auto p = P::pure('a');
-    auto p1 = p.bind([](char v) {
-      if (v == 'a') {
-        return P::pure('c');
-      } else {
-        return P::pure('x');
-      }
-    });
-    auto p2 = p1.bind([](char v) {
-      if (v == 'c') {
-        return P::pure('x');
-      } else
-        return P::pure('z');
-    });
-    auto r = p2.run_parser(s);
-
-    REQUIRE(r.value.value() == 'x');
-  }
-
-  SECTION("bind 4", "test operator") {
-    auto p = P::pure('a');
-    auto p1 = (p >>= [](char v) {
-      if (v == 'a') {
-        return P::pure('c');
-      } else {
-        return P::pure('x');
-      }
-    }) >>= ([](char v) {
-      if (v == 'c') {
-        return P::pure('x');
-      } else
-        return P::pure('z');
-    });
-
-    auto r = p1.run_parser(s);
-    REQUIRE(r.value.value() == 'x');
-  }
-
-  SECTION("bind 5", "test bind by external reference") {
-    auto p = P::pure('a');
-    auto q = P::pure('b');
-    auto h = P::pure('h');
-
-    auto r1 = (p >>= [&](char v) {
-                if (v == 'a') {
-                  return q;
-                } else {
-                  return h;
-                }
-              }).run_parser(s);
-
-    // for this to work we capture everything in bind.
-    // there might be more opportunity for optmization.
-    auto p1 = p >>= [=](char v) {
-      if (v == 'a') {
-        auto q1 = q;
-        return q1;
-      } else {
-        auto h1 = h;
-        return h1;
-      }
-    };
-
-    auto r2 = p1.run_parser(s);
-
-    REQUIRE(r1.value.value() == 'b');
-    REQUIRE(r2.value.value() == 'b');
-  }
-
-  SECTION("bind 5", "sequence") {
-    auto p = P::pure('a');
-    auto q = P::pure('b');
-    auto h = P::pure('c');
-
-    auto p1 = (p >> q);
-    auto p2 = p1 >> h;
-    auto r = p2.run_parser(s);
-    REQUIRE(r.value.value() == 'c');
+    std::cout << r.value.value()  << std::endl;
   }
 }
 
-TEST_CASE("applicative") {
-  SECTION("ap", "ap 1") {
+// TEST_CASE("bind") {
+//   using namespace cppparsec;
+//   using namespace cppparsec::stream;
+//   using P = Parser<StringState, char>;
+//   StringState s("abc\ndef\nghi\n");
 
-  }
+//   SECTION("bind 1") {
 
-}
+//     auto p = P::pure('a');
+//     auto r = p.bind([](char v) {
+//                 if (v == 'c') {
+
+//                   return P::pure('c');
+//                 } else {
+//                   return P::pure('x');
+//                 }
+//               }).run_parser(s);
+//     REQUIRE(r.value.value() == 'x');
+//   }
+
+//   SECTION("bind 2", "lifetime check 1, intermidiate") {
+//     auto p = P::pure('a');
+//     auto p1 = p.bind([](char v) {
+//                  if (v == 'a') {
+//                    return P::pure('c');
+//                  } else {
+//                    return P::pure('x');
+//                  }
+//                }).bind([](char v) {
+//       if (v == 'c') {
+//         return P::pure('x');
+
+//       } else
+//         return P::pure('z');
+//     });
+//     auto r = p1.run_parser(s);
+
+//     REQUIRE(r.value.value() == 'x');
+//   }
+
+//   SECTION("bind 3", "lifetime check 2, move resilience") {
+//     auto p = P::pure('a');
+//     auto p1 = p.bind([](char v) {
+//       if (v == 'a') {
+//         return P::pure('c');
+//       } else {
+//         return P::pure('x');
+//       }
+//     });
+//     auto p2 = p1.bind([](char v) {
+//       if (v == 'c') {
+//         return P::pure('x');
+//       } else
+//         return P::pure('z');
+//     });
+//     auto r = p2.run_parser(s);
+
+//     REQUIRE(r.value.value() == 'x');
+//   }
+
+//   SECTION("bind 4", "test operator") {
+
+//     auto p = P::pure('a');
+//     auto p1 = ((p >>= [](char v) {
+//                  if (v == 'a') {
+//                    return P::pure('c');
+//                  } else {
+//                    return P::pure('x');
+//                  }
+//                }) >>= ([](char v) {
+//                  if (v == 'c') {
+//                    return P::pure('x');
+//                  } else
+//                    return P::pure('z');
+//                })) >>= ([](char v) {
+//       if (v == 'x') {
+//         return P::pure('z');
+//       } else {
+//         return P::pure('m');
+//       }
+//     });
+
+//     auto r = p1.run_parser(s);
+//     REQUIRE(r.value.value() == 'z');
+//   }
+
+//   SECTION("bind 5", "test bind by capturing existing parsers in the scope") {
+//     auto p = P::pure('a');
+//     auto q = P::pure('b');
+//     auto h = P::pure('h');
+
+//     auto r1 = (p >>= [&](char v) {
+//                 if (v == 'a') {
+//                   return q;
+//                 } else {
+//                   return h;
+//                 }
+//               }).run_parser(s);
+
+//     auto p1 = p >>= [=](char v) {
+//       if (v == 'a') {
+//         auto q1 = q;
+//         return q1;
+//       } else {
+//         auto h1 = h;
+//         return h1;
+//       }
+//     };
+
+//     auto r2 = p1.run_parser(s);
+
+//     REQUIRE(r1.value.value() == 'b');
+//     REQUIRE(r2.value.value() == 'b');
+//   }
+
+//   SECTION("bind 5", "sequence") {
+//     auto p = P::pure('a');
+//     auto q = P::pure('b');
+//     auto h = P::pure('c');
+
+//     auto p1 = (p >> q);
+//     auto p2 = p1 >> h;
+//     auto r = p2.run_parser(s);
+//     REQUIRE(r.value.value() == 'c');
+//   }
+
+//   SECTION("bind 6", "nested") {
+//     auto p = P::pure('a');
+//     auto q = P::pure('b');
+//     auto h = P::pure('c');
+
+//     auto p1 = p >>= [=](char a) {
+//       return q >>=
+//              [=](char b) { return h >>= [=](char c) { return P::pure('z'); }; };
+//     };
+
+//     auto r = p1.run_parser(s);
+//     REQUIRE(r.value.value() == 'z');
+//   }
+
+  // TODO can't bind any different types...
+  // this is embarassing.
+  // SECTION("bind 7", "apply function") {
+  //   using PInt = Parser<StringState, int>;
+  //   auto p = P::pure('a');
+  //   auto i = PInt::pure(1);
+
+  //   auto p1 = p >>=
+  //       [=](char v) { return i >>= [=](int n) { return PInt::pure(10); }; };
+
+  //   auto r = p1.run_parser(s);
+  //   REQUIRE(r.value.value() == 'f');
+  // }
+
+  // TODO
+  // Can't bind function
+  // SECTION("bind 7", "apply function") {
+  //   using Fn = std::function<char(char)>;
+  //   using PFun = Parser<StringState, Fn>;
+  //   auto p = P::pure('a');
+  //   auto m = PFun::pure([](char v) { return 'f'; });
+
+  //   auto p1 = m >>= [=](Fn fn) { return P::pure(fn('a')); };
+  //   auto r = p1.run_parser(s);
+  //   REQUIRE(r.value.value() == 'f');
+  // }
+// }
+
+// // TODO applicative doesn't work.
+// TEST_CASE("applicative") {
+//   using namespace cppparsec;
+//   using namespace cppparsec::stream;
+//   using P = Parser<StringState, char>;
+//   StringState s("abc\ndef\nghi\n");
+
+//   SECTION("ap", "ap 1") {
+//     using Fn = std::function<char(char)>;
+//     using PFn = Parser<StringState, Fn>;
+//     auto p = PFn::pure([=](char v) { return 'a'; });
+//     auto q = P::pure('b');
+//     auto h = P::pure('c');
+
+//     auto p1 = q.ap(p);
+//   }
+// }

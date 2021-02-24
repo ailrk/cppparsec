@@ -5,11 +5,18 @@
 
 namespace cppparsec::util {
 
+template <typename... P> struct parameter_pack {
+  template <template <typename...> typename T> using apply = T<P...>;
+};
+
 template <typename T> struct function_traits_impl { using type = void; };
 template <typename Ret, typename Class, typename... Args>
 struct function_traits_impl<Ret (Class::*)(Args...) const> {
   using type = std::function<Ret(Args...)>;
   using return_type = Ret;
+
+  template <template <typename...> typename F> // all arguments
+  using args_pack = typename parameter_pack<Args...>::template apply<F>;
 };
 
 template <typename F>
