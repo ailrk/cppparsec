@@ -17,6 +17,8 @@ public:
 
     const std::string &to_string() const { return text; }
 
+    Message() : error_kind(Error::SysUnExpect), text() {}
+
     Message(Error error_kind, std::string text)
         : error_kind(error_kind), text(text) {}
   };
@@ -28,6 +30,7 @@ private:
   Messages messages;
 
 public:
+  ParseError() : position(Position{1, 1}), messages() {}
   ParseError(const Position &position, const Messages &messages)
       : position(position), messages(messages) {}
 

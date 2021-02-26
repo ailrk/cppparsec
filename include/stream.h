@@ -64,7 +64,6 @@ class StringState {
   Position position;
 
 public:
-
   // update stream, return a new String Stream.
   // note because it just pass a string view, copy cost almost nothing.
   using DataType = std::string_view;
@@ -73,6 +72,8 @@ public:
 
   constexpr StringState(std::string_view s)
       : data(s), position(Position{1, 1}) {}
+
+  constexpr StringState() : data(""), position(Position{1, 1}) {}
 
   // copy the string stream with the same state.
   // Thisis essential for retrying.
