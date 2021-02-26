@@ -50,35 +50,36 @@ TEST_CASE("parser basis") {
   StringState s("abc\ndef\nghi\n");
 
   SECTION("creation1") {
-    auto p = PChar::make_parser([](StringState s) {
+    auto p = PChar::create([](StringState s) {
       return PChar::reply::mk_cok_reply('c', s, unknown_error(s));
     });
     auto r = p(s);
-    std::cout << r.value.value() << std::endl;
+
+    REQUIRE(r.value.value() == 'c');
   }
 
   SECTION("creation2") {
-    auto p = PChar::make_parser([](StringState s) {
+    auto p = PChar::create([](StringState s) {
       return PChar::reply::mk_cerr_reply(s, unknown_error(s));
     });
     auto r = p(s);
-    std::cout << r.value.has_value() << std::endl;
+    REQUIRE(!r.value.has_value());
   }
 
   SECTION("creation3") {
-    auto p = PChar::make_parser([](StringState s) {
+    auto p = PChar::create([](StringState s) {
       return PChar::reply::mk_eok_reply('c', s, unknown_error(s));
     });
     auto r = p(s);
-    std::cout << r.value.value() << std::endl;
+    REQUIRE(r.value.value() == 'c');
   }
 
   SECTION("creation4") {
-    auto p = PChar::make_parser([](StringState s) {
+    auto p = PChar::create([](StringState s) {
       return PChar::reply::mk_eerr_reply(s, unknown_error(s));
     });
     auto r = p(s);
-    std::cout << r.value.has_value() << std::endl;
+    REQUIRE(!r.value.has_value());
   }
 }
 
@@ -90,7 +91,7 @@ TEST_CASE("parser map") {
   StringState s("abc\ndef\nghi\n");
 
   SECTION("int -> char") {
-    auto p = PChar::make_parser([](StringState s) {
+    auto p = PChar::create([](StringState s) {
       return PChar::reply::mk_cok_reply('c', s, unknown_error(s));
     });
 
@@ -98,12 +99,12 @@ TEST_CASE("parser map") {
 
     auto p1 = p.map(fn);
     auto r = p1(s);
-    std::cout << r.value.value() << std::endl;
+    REQUIRE(r.value.value() == 1);
   }
 
   SECTION("int -> char -> doube") {
     // life time is ok because all parser get copied.
-    auto p = PChar::make_parser([](StringState s) {
+    auto p = PChar::create([](StringState s) {
       return PChar::reply::mk_cok_reply('c', s, unknown_error(s));
     });
 
@@ -114,8 +115,30 @@ TEST_CASE("parser map") {
 
     auto p1 = p.map(fn).map(fn1).map(fn2).map(fn3);
     auto r = p1(s);
-    std::cout << r.value.value() << std::endl;
+    REQUIRE(r.value.value() == "string");
   }
+}
 
+TEST_CASE("bind") {
+  using namespace cppparsec;
+  using namespace cppparsec::stream;
+  using PChar = Parser<StringState, char>;
+  using PInt = Parser<StringState, int>;
+  StringState s("abc\ndef\nghi\n");
 
+  SECTION("basic bind") {
+    auto p = PChar::create([](StringState s) {
+      return PChar::reply::mk_cok_reply('c', s, unknown_error(s));
+    });
+
+    auto fn = [](int a) {
+      return PInt::create([](StringState s) {
+        return PInt::reply::mk_cok_reply(1, s, unknown_error(s));
+      });
+    };
+
+    auto p1 = p.bind(fn);
+    auto r = p1(s);
+    REQUIRE(r.value.value() == 1);
+  }
 }

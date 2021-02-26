@@ -45,19 +45,24 @@ public:
             state, error};
   }
 
-  // smart constructors to avoid invalid state.
+  // make some smart constructors to avoid invalid state.
+
+  // the stream is consumed and no error occurs.
   static Reply<S, T> mk_cok_reply(T value, S state, ParseError error) {
     return {true, true, {value}, state, error};
   }
 
+  // the stream is consumed and an error occurs;
   static Reply<S, T> mk_cerr_reply(S state, ParseError error) {
     return {true, false, {}, state, error};
   }
 
+  // the stream is not consumed and no error occurs.
   static Reply<S, T> mk_eok_reply(T value, S state, ParseError error) {
     return {false, true, {value}, state, error};
   }
 
+  // the stream is not consumed and error occurs.
   static Reply<S, T> mk_eerr_reply(S state, ParseError error) {
     return {false, false, {}, state, error};
   }
@@ -93,31 +98,85 @@ template <typename S, typename T> struct parser_trait<Parser<S, T>> {
   using stream = typename Parser<S, T>::stream;
 };
 
-// wrapper type for parser
+template <stream::state_type S, typename T>
+static Parser<S, T> make_parser(std::function<Reply<S, T>(S)> transition);
+
 template <stream::state_type S, typename T> class Parser {
-  ParserFn<S, T> parser;
 
 public:
   using reply = Reply<S, T>;
   using type = T;
   using stream = S;
-  // unwrap reply received from the previous continuation.
-  // If it's ok just return the same reply.
-  // If it's error create new correspoinding error reply.
+  ParserFn<S, T> unparser;
 
-  Parser(const ParserFn<S, T> &parser) : parser(parser) {}
-  Parser(Parser<S, T> &&parser) : parser(std::move(parser)) {}
+  Parser(const ParserFn<S, T> &parser) : unparser(parser) {}
+  Parser(Parser<S, T> &&parser) : unparser(std::move(parser)) {}
+  Reply<S, T> operator()(const S &state);
 
-  // run the parser.
-  Reply<S, T> operator()(const S &state) {
-    Reply<S, T> r;
+  template <typename Fn, typename U = typename function_traits<Fn>::return_type>
+  Parser<S, U> map(const Fn &fn);
 
-    auto ok = [&r](auto rep) {
-      r = rep;
-      return r.ok;
-    };
+  template <typename Fm, typename P = typename function_traits<Fm>::return_type,
+            typename U = typename parser_trait<P>::type>
+  Parser<S, U> bind(Fm fm);
 
-    parser(state,
+  template <typename M, typename Fn = typename parser_trait<M>::value,
+            typename U = typename function_traits<Fn>::return_type>
+  Parser<S, U> apply(M m);
+
+  Parser<S, T> option(Parser<S, T>, Parser<S, T>);
+
+  static Parser<S, T> create(auto... params) {
+    return make_parser<S, T>(std::forward<T>(params)...);
+  }
+
+  friend Parser<S, T> operator|(Parser<S, T>, Parser<S, T>);
+  friend Parser<S, T> operator*(Parser<S, T>, Parser<S, T>);
+
+  friend auto operator>>=(Parser<S, T> p, auto fm) { return p.bind(fm); }
+};
+
+// low level unfold the parser.
+template <stream::state_type S, typename T>
+static Parser<S, T> make_parser(std::function<Reply<S, T>(S)> transition) {
+  return Parser([transition](S state, ContinuationPack<S, T> cont) {
+    Reply<S, T> r = transition(state);
+
+    assert((r.ok && r.value != std::nullopt) ||
+           (!r.ok && r.value == std::nullopt));
+
+    if (r.consumed) {
+      if (r.ok) {
+        cont.cok(r);
+
+      } else {
+        cont.cerr(r.error);
+      }
+
+    } else {
+      if (r.ok) {
+        cont.eok(r);
+
+      } else {
+        cont.eerr(r.error);
+      }
+    }
+
+    return r.ok;
+  });
+}
+
+// top level runner. To get value back from the continuation.
+template <stream::state_type S, typename T>
+Reply<S, T> Parser<S, T>::operator()(const S &state) {
+  Reply<S, T> r;
+
+  auto ok = [&r](auto rep) {
+    r = rep;
+    return r.ok;
+  };
+
+  unparser(state,
 
            {
 
@@ -138,133 +197,106 @@ public:
                    }
 
            });
-    return r;
-  }
+  return r;
+}
 
-  // low level unfold the parser.
-  static Parser<S, T> make_parser(std::function<Reply<S, T>(S)> transition) {
-    return Parser([transition](S state, ContinuationPack<S, T> cont) {
-      Reply<S, T> r = transition(state);
+template <stream::state_type S, typename T>
+template <typename Fn, typename U>
+Parser<S, U> Parser<S, T>::map(const Fn &fn) {
 
-      assert((r.ok && r.value != std::nullopt) ||
-             (!r.ok && r.value == std::nullopt));
+  return Parser<S, U>(
+      [fn, p = unparser](const S &state, const ContinuationPack<S, U> &cont) {
+        auto mapped_ok = [&cont, &fn](Reply<S, T> rep) {
+          cont.cok(rep.map(fn));
+          return rep.ok;
+        };
 
-      if (r.consumed) {
-        if (r.ok) {
-          cont.cok(r);
+        return p(state,
 
-        } else {
-          cont.cerr(r.error);
-        }
+                 // only need to map continuations that carry values.
+                 {
 
-      } else {
-        if (r.ok) {
-          cont.eok(r);
+                     .cok = mapped_ok,
 
-        } else {
-          cont.eerr(r.error);
-        }
-      }
+                     .cerr = cont.cerr,
 
-      return r.ok;
-    });
-  }
+                     .eok = mapped_ok,
 
-  template <typename Fn, typename U = typename function_traits<Fn>::return_type>
-  Parser<S, U> map(const Fn &fn) {
+                     .eerr = cont.eerr
 
-    return Parser<S, U>(
-        [fn, p = parser](const S &state, const ContinuationPack<S, U> &cont) {
-          auto mapped_ok = [&cont, &fn](Reply<S, T> rep) {
-            cont.cok(rep.map(fn));
-            return rep.ok;
-          };
+                 });
+      });
+}
 
-          return p(state,
+// Monadic bind
+template <stream::state_type S, typename T>
+template <typename Fm, typename P, typename U>
+Parser<S, U> Parser<S, T>::bind(Fm fm) {
+  static_assert(std::is_convertible_v<Fm, std::function<Parser<S, U>(T)>>);
 
-                   // only need to map continuations that carry values.
+  return Parser<S, U>([=, p = unparser](S state, ContinuationPack<S, U> cont) {
+    return p(state,
+
+             {
+
+                 // if consumed and ok, just pass over.
+                 [=](Reply<S, T> rep) {
+                   assert(rep.value.has_value());
+
+                   auto cok = cont.cok;
+                   auto cerr = cont.cerr;
+                   auto peok = [=](Reply<S, U> rep1) {
+                     rep1.error = rep.error + rep1.error;
+                     return cont.cok(rep1);
+                   };
+                   auto peerr = [=](ParseError e) {
+                     ParseError error = rep.error + e;
+                     return cont.cerr(error);
+                   };
+
                    {
 
-                       .cok = mapped_ok,
-
-                       .cerr = cont.cerr,
-
-                       .eok = mapped_ok,
-
-                       .eerr = cont.eerr
-
+                     Parser<S, U> m = fm(rep.value.value());
+                     return m.unparser(state, {cok, cerr, peok, peerr});
                    }
+                 },
 
-          );
-        });
-  }
+                 cont.cerr,
 
-  // Monadic bind
-  template <typename Fm, typename P = typename function_traits<Fm>::return_type,
-            typename U = typename parser_trait<P>::type>
-  Parser<S, U> bind(Fm fm) {
-    static_assert(std::is_convertible_v<Fm, std::function<Parser<S, U>(T)>>);
+                 // empty but ok.
+                 [=](Reply<S, T> rep) {
+                   assert(rep.value.has_value());
 
-    return Parser<S, U>([=, p = parser](S state, ContinuationPack<S, U> cont) {
-      return p(state,
+                   auto cok = cont.cok;
+                   auto cerr = cont.cerr;
+                   auto peok = [=](Reply<S, U> rep1) {
+                     rep1.error = rep.error + rep1.error;
+                     return cont.eok(rep1);
+                   };
+                   auto peerr = [=](ParseError e) {
+                     ParseError error = rep.error + e;
+                     return cont.eerr(e);
+                   };
 
-               // monadic bind.
-               {
-
-                   // if consumed and ok, just pass over.
-                   [=](Reply<S, T> rep) {
-                     assert(rep.value.has_value());
+                   {
                      Parser<S, U> m = fm(rep.value.value());
+                     return m.unparser(state, {cok, cerr, peok, peerr});
+                   }
+                 },
 
-                     auto cok = cont.cok;
-                     auto cerr = cont.cerr;
+                 cont.eerr
 
-                     auto peok = [=](Reply<S, U> rep1) {
-                       rep1.error = rep.error + rep1.error;
-                       cont.cok(rep1);
-                       return rep1.ok;
-                     };
+             });
+  });
+}
 
-                     auto peerr = [=](Reply<S, U> rep1) {
-                       ParseError error = rep.error + rep1.error;
-                       cont.cerr(error);
-                       return rep1.ok;
-                     };
+// | is a abelian group.
+// * is a non commutative monoid.
+// with two identities respect to each operation we constructed a ring!
+template <stream::state_type S, typename T>
+Parser<S, T> operator|(Parser<S, T> p, Parser<S, T> q) {}
 
-                     return m(state, {cok, cerr, peok, peerr}).ok;
-                   },
-
-                   cont.cerr,
-
-                   // empty but ok.
-                   [=](Reply<S, T> rep) {
-                     assert(rep.value.has_value());
-                     Parser<S, U> m = fm(rep.value.value());
-
-                     auto cok = cont.cok;
-                     auto cerr = cont.cerr;
-
-                     auto peok = [=](Reply<S, U> rep1) {
-                       rep1.error = rep.error + rep1.error;
-                       return rep1.ok;
-                     };
-
-                     auto peerr = [=](Reply<S, U> rep1) {
-                       ParseError error = rep.error + rep1.error;
-                       return rep1.ok;
-                     };
-
-                     return m(state, {cok, cerr, peok, peerr}).ok;
-                   },
-
-                   cont.eerr
-
-               });
-    });
-  }
-
-  friend Parser<S, T> operator|(Parser<S, T>, Parser<S, T>);
-  friend Parser<S, T> operator*(Parser<S, T>, Parser<S, T>);
-};
+template <stream::state_type S, typename T>
+Parser<S, T> operator*(Parser<S, T> p, Parser<S, T> q) {}
 
 } // namespace cppparsec
