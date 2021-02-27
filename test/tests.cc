@@ -89,14 +89,16 @@ TEST_CASE("parser map") {
   using PChar = Parser<StringState, char>;
   using PInt = Parser<StringState, int>;
   StringState s("abc\ndef\nghi\n");
+  auto p = PChar::create([](StringState s) {
+    return PChar::reply::mk_cok_reply('c', s, unknown_error(s));
+  });
+
+  auto fn = [](char v) -> int { return 1; };
+  auto fn1 = [](int v) -> char { return 'a'; };
+  auto fn2 = [](char v) -> double { return 11.1; };
+  auto fn3 = [](double v) -> std::string { return "string"; };
 
   SECTION("int -> char") {
-    auto p = PChar::create([](StringState s) {
-      return PChar::reply::mk_cok_reply('c', s, unknown_error(s));
-    });
-
-    auto fn = [](char v) -> int { return 1; };
-
     auto p1 = p.map(fn);
     auto r = p1(s);
     REQUIRE(r.value.value() == 1);
@@ -104,15 +106,6 @@ TEST_CASE("parser map") {
 
   SECTION("int -> char -> doube") {
     // life time is ok because all parser get copied.
-    auto p = PChar::create([](StringState s) {
-      return PChar::reply::mk_cok_reply('c', s, unknown_error(s));
-    });
-
-    auto fn = [](char v) -> int { return 'a'; };
-    auto fn1 = [](int v) -> char { return 'a'; };
-    auto fn2 = [](char v) -> double { return 11.1; };
-    auto fn3 = [](double v) -> std::string { return "string"; };
-
     auto p1 = p.map(fn).map(fn1).map(fn2).map(fn3);
     auto r = p1(s);
     REQUIRE(r.value.value() == "string");
@@ -124,21 +117,73 @@ TEST_CASE("bind") {
   using namespace cppparsec::stream;
   using PChar = Parser<StringState, char>;
   using PInt = Parser<StringState, int>;
+  using PStr = Parser<StringState, std::string>;
   StringState s("abc\ndef\nghi\n");
+  auto p = PChar::create([](StringState s) {
+    return PChar::reply::mk_cok_reply('c', s, unknown_error(s));
+  });
 
-  SECTION("basic bind") {
-    auto p = PChar::create([](StringState s) {
+  auto fn = [](int a) { // int -> m char
+    return PChar::create([](StringState s) {
       return PChar::reply::mk_cok_reply('c', s, unknown_error(s));
     });
+  };
 
-    auto fn = [](int a) {
-      return PInt::create([](StringState s) {
-        return PInt::reply::mk_cok_reply(1, s, unknown_error(s));
-      });
-    };
+  auto fn1 = [](char a) { // char -> m int
+    return PInt::create([](StringState s) {
+      return PInt::reply::mk_cok_reply(1, s, unknown_error(s));
+    });
+  };
 
-    auto p1 = p.bind(fn);
+  auto fn2 = [](int a) { // int -> string
+    return PStr::create([](StringState s) {
+      return PStr::reply::mk_cok_reply("string", s, unknown_error(s));
+    });
+  };
+
+  SECTION("basic bind") {
+    auto p1 = p.bind(fn1);
     auto r = p1(s);
     REQUIRE(r.value.value() == 1);
+  }
+
+  SECTION("multiple bind0") {
+    auto p1 = p.bind(fn).bind(fn1).bind(fn2);
+    auto r = p1(s);
+    REQUIRE(r.value.value() == "string");
+  }
+
+  SECTION("multiple bind1") {
+    // auto p1 = p.bind(fn).bind(fn1).bind(fn2);
+    auto p1 = ((p >>= fn1) >>= fn) >>= fn2;
+    auto r = p1(s);
+    REQUIRE(r.value.value() == "string");
+  }
+}
+
+TEST_CASE("apply") {
+  using namespace cppparsec;
+  using namespace cppparsec::stream;
+  using PInt = Parser<StringState, int>;
+  using PChar = Parser<StringState, char>;
+  using PFn1 = Parser<StringState, std::function<int(int)>>;
+  using PFn2 = Parser<StringState, std::function<char(int)>>;
+
+  StringState s("abc\ndef\nghi\n");
+
+  auto p = PInt::create([](StringState s) {
+    return PInt::reply::mk_cok_reply(0, s, unknown_error(s));
+  });
+
+  auto m1 = PFn1::pure([](int a) { return a + 99; });
+  auto m2 = PFn2::pure([](int a) { return 'd'; });
+
+  SECTION("apply 1") {
+    auto p1 = p.apply(m1);
+    auto r = p1(s);
+    REQUIRE(r.value.value() == 99);
+  }
+
+  SECTION("apply 2") {
   }
 }
