@@ -1,4 +1,4 @@
 #pragma once
 #include "combinator.h"
-#include "parser.h"
+#include "core.h"
 #include "stream.h"

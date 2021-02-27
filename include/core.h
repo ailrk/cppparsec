@@ -372,6 +372,21 @@ template <stream::state_type S, typename T>
 Parser<S, std::vector<T>>
 many_accum(std::function<std::vector<T>(T, std::vector<T>)> fn, Parser<S, T> p);
 
+
+// term parser
+//  PrettyPrint: std::function<std::string(U)>,  pretty printing fuction for the
+//  token.
+//  Position: std::functions<Position(U)>,    getting the position of the token.
+//  Match: std::functions<optional<T>(U)> matching function
+template <stream::state_type S, typename T, typename PrettyPrint,
+          typename Position, typename Match>
+Parser<S, T> token(PrettyPrint pretty_print, Position position, Match match);
+
+template <stream::state_type S, typename T, typename PrettyPrint,
+          typename NextPosition, typename Match>
+Parser<S, T> token_prim(PrettyPrint pretty_print, NextPosition npos, Match match);
+
+
 } // namespace cppparsec
 
 // some debuggin utilities

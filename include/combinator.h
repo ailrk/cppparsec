@@ -1,5 +1,5 @@
 #pragma once
-#include "parser.h"
+#include "core.h"
 #include "stream.h"
 #include <algorithm>
 #include <deque>

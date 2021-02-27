@@ -1,5 +1,5 @@
 // define some useful tokens for parsing languages.
 #pragma once
-#include "parser.h"
+#include "core.h"
 
 namespace cppparsec {} // namespace cppparsec
