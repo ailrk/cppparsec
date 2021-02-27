@@ -7,6 +7,7 @@
 #include <functional>
 #include <optional>
 #include <type_traits>
+#include <variant>
 #include <vector>
 
 namespace cppparsec {
@@ -132,7 +133,7 @@ public:
             typename U = typename function_traits<Fn>::return_type>
   Parser<S, U> apply(M m);
 
-  Parser<S, T> option(Parser<S, T>, Parser<S, T>);
+  Parser<S, T> alt(Parser<S, T>, Parser<S, T>);
 
   // create parser from a transition function. low level helper.
   static Parser<S, T> create(std::function<Reply<S, T>(S)> transition) {
@@ -318,7 +319,7 @@ Parser<S, T> onep([]() {
 });
 
 template <stream::state_type S, typename T>
-Parser<S, T> Parser<S, T>::option(Parser<S, T>, Parser<S, T>) {
+Parser<S, T> Parser<S, T>::alt(Parser<S, T>, Parser<S, T>) {
   return Parser<S, T>([=, p = unparser](S state, ContinuationPack<S, T> cont) {
     // TODO
   });
@@ -329,7 +330,7 @@ Parser<S, T> Parser<S, T>::option(Parser<S, T>, Parser<S, T>) {
 // with two identities respect to each operation we constructed a ring!
 template <stream::state_type S, typename T>
 Parser<S, T> operator|(Parser<S, T> p, Parser<S, T> q) {
-  return p.option(q);
+  return p.alt(q);
 }
 
 template <stream::state_type S, typename T>
@@ -363,8 +364,9 @@ constexpr Parser<S, T> look_ahead(Parser<S, T> p);
 template <stream::state_type S, typename T>
 constexpr Parser<S, std::vector<T>> many(Parser<S, T> p);
 
+// skip many and return nothing.
 template <stream::state_type S, typename T>
-Parser<S, void> skip_many(Parser<S, T> p);
+Parser<S, std::monostate> skip_many(Parser<S, T> p);
 
 template <stream::state_type S, typename T>
 Parser<S, std::vector<T>>

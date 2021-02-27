@@ -55,9 +55,7 @@ template <typename T> concept state_type = requires(T t) {
   ->std::same_as<bool>;
 };
 
-/*
- * Stream type for string_view.
- */
+// Stream type for string_view.
 class StringState {
 
   std::string_view data;
@@ -104,9 +102,7 @@ constexpr size_t StringState::get_col() const { return position.col; };
 
 constexpr Position StringState::get_position() const { return position; }
 
-/*
- * Return the underlying string view.
- */
+// Return the underlying string view.
 constexpr const std::optional<const std::string_view>
 StringState::lookahead() const {
   if (is_empty()) {
@@ -115,10 +111,8 @@ StringState::lookahead() const {
   return {data};
 }
 
-/*
- * Eat the next n tokens, and return a new StringStream with
- * updated position.
- */
+// Eat the next n tokens, and return a new StringStream with
+// updated position.
 std::unique_ptr<StringState> StringState::eat(size_t n) const {
   return std::make_unique<StringState>(data.substr(n), [&]() {
     if (is_empty()) {
