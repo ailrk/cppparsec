@@ -302,10 +302,16 @@ Parser<S, U> Parser<S, T>::apply(M m) {
 // zerop will always fail and never consume input.
 template <stream::state_type S, typename T>
 Parser<S, T> zerop([]() {
-
+  // TODO
 });
 
 // Identity for operator*
+// onep will not accept no input.
+// this is purely for the algebraic property...
+template <stream::state_type S, typename T>
+Parser<S, T> onep([]() {
+
+});
 
 template <stream::state_type S, typename T>
 Parser<S, T> Parser<S, T>::option(Parser<S, T>, Parser<S, T>) {
