@@ -10,8 +10,16 @@
 #include <string>
 #include <vector>
 
-namespace cppparsec::combinator {
-template <stream::state_type S, typename T>
-constexpr auto attempt(Parser<S, T> p) -> Parser<S, T>;
+namespace cppparsec {
 
-}
+template <stream::state_type S, typename T>
+Parser<S, T> choice(std::vector<Parser<S, T>> options);
+
+template <stream::state_type S, typename T>
+Parser<S, std::vector<T>> count(uint32_t n, std::vector<T> options);
+
+template <stream::state_type S, typename T, typename Open, typename Close>
+Parser<S, T> between(Parser<S, Open> o, Parser<S, Close> c, Parser<S, T> p);
+
+
+} // namespace cppparsec

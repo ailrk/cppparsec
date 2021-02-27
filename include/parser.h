@@ -237,12 +237,15 @@ Parser<S, U> Parser<S, T>::bind(Fm fm) {
 
              {
 
-                 // if consumed and ok, just pass over.
+                 // cok
                  [=](Reply<S, T> reply) {
                    assert(reply.value.has_value());
 
                    auto cok = cont.cok;
                    auto cerr = cont.cerr;
+
+                   // go with the consumed continuation when m.unparser doesn't
+                   // consume but ok.
                    auto peok = [=](Reply<S, U> rep1) {
                      rep1.error = reply.error + rep1.error;
                      return cont.cok(rep1);
@@ -261,12 +264,13 @@ Parser<S, U> Parser<S, T>::bind(Fm fm) {
 
                  cont.cerr,
 
-                 // empty but ok.
+                 // eok
                  [=](Reply<S, T> reply) {
                    assert(reply.value.has_value());
 
                    auto cok = cont.cok;
                    auto cerr = cont.cerr;
+
                    auto peok = [=](Reply<S, U> rep1) {
                      rep1.error = reply.error + rep1.error;
                      return cont.eok(rep1);
@@ -332,5 +336,38 @@ template <stream::state_type S, typename T>
 Parser<S, T> operator*(Parser<S, T> p, Parser<S, T> q) {
   return p >>= [=](T _) { return q; };
 }
+
+} // namespace cppparsec
+
+// define some core utilities.
+namespace cppparsec {
+// TODO
+
+// term parser.
+template <stream::state_type S, typename T>
+constexpr Parser<S, T> token(std::function<T(std::string)> pprint,
+                             std::function<Position(T)> pos,
+                             std::function<std::optional<T>(T)> parse);
+
+// Arbitrary lookahead.
+// Try parser p, if an error occurs it will rewind the stream back to the
+// previous state and pretent it didn't consume anything.
+template <stream::state_type S, typename T>
+constexpr Parser<S, T> attempt(Parser<S, T> p);
+
+// Parse `p` without consume any input.
+template <stream::state_type S, typename T>
+constexpr Parser<S, T> look_ahead(Parser<S, T> p);
+
+// parse `p` zero or more times.
+template <stream::state_type S, typename T>
+constexpr Parser<S, std::vector<T>> many(Parser<S, T> p);
+
+template <stream::state_type S, typename T>
+Parser<S, void> skip_many(Parser<S, T> p);
+
+template <stream::state_type S, typename T>
+Parser<S, std::vector<T>>
+many_accum(std::function<std::vector<T>(T, std::vector<T>)> fn, Parser<S, T> p);
 
 } // namespace cppparsec
