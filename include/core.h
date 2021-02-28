@@ -133,7 +133,7 @@ public:
             typename U = typename function_traits<Fn>::return_type>
   Parser<S, U> apply(M m);
 
-  Parser<S, T> alt(Parser<S, T>, Parser<S, T>);
+  Parser<S, T> alt(Parser<S, T>);
 
   // create parser from a transition function. low level helper.
   static Parser<S, T> create(std::function<Reply<S, T>(S)> transition) {
@@ -303,31 +303,46 @@ Parser<S, U> Parser<S, T>::apply(M m) {
   return p1;
 }
 
-// Identity for operator|
-// zerop will always fail and never consume input.
+// Identity for operator|. zerop will always fail and never consume input.
 template <stream::state_type S, typename T>
 Parser<S, T> zerop([]() {
   // TODO
 });
 
-// Identity for operator*
-// onep will not accept no input.
-// this is purely for the algebraic property...
+// Identity for operator* open will not accept no input. This is purely for the
+// algebraic property...
 template <stream::state_type S, typename T>
 Parser<S, T> onep([]() {
 
 });
 
+// TODO not tested
+// Parse `m` first, if succeed, go though with the result. If failed try to
+// parse n with the current stream state. Note if `m` is failed and consumed
+// input, the input will not be rewind when parsing `n`.
 template <stream::state_type S, typename T>
-Parser<S, T> Parser<S, T>::alt(Parser<S, T>, Parser<S, T>) {
-  return Parser<S, T>([=, p = unparser](S state, ContinuationPack<S, T> cont) {
-    // TODO
+Parser<S, T> Parser<S, T>::alt(Parser<S, T> n) {
+  return Parser([=, m = unparser](S state, ContinuationPack<S, T> cont) {
+    auto meerr = [=](ParseError error) { // when m fails, parse n.
+      auto neok = [=](Reply<S, T> reply) {
+        reply.error = reply.error + error;
+        return cont.eok(reply);
+      };
+
+      auto neerr = [=](ParseError error1) { return cont.eerr(error + error1); };
+
+      return n.unparser(state, {cont.cok, cont.cerr, neok, neerr});
+    };
+
+    return p(state, {cont.cok, cont.cerr, cont.eok, meerr});
   });
 }
 
-// | is a abelian group.
-// * is a non commutative monoid.
-// with two identities respect to each operation we constructed a ring!
+/*
+ * | is a abelian group, * is a non commutative monoid.
+ * with two identities respect to each operation we constructed a ring!
+ */
+
 template <stream::state_type S, typename T>
 Parser<S, T> operator|(Parser<S, T> p, Parser<S, T> q) {
   return p.alt(q);
@@ -372,7 +387,6 @@ template <stream::state_type S, typename T>
 Parser<S, std::vector<T>>
 many_accum(std::function<std::vector<T>(T, std::vector<T>)> fn, Parser<S, T> p);
 
-
 // term parser
 //  PrettyPrint: std::function<std::string(U)>,  pretty printing fuction for the
 //  token.
@@ -384,8 +398,8 @@ Parser<S, T> token(PrettyPrint pretty_print, Position position, Match match);
 
 template <stream::state_type S, typename T, typename PrettyPrint,
           typename NextPosition, typename Match>
-Parser<S, T> token_prim(PrettyPrint pretty_print, NextPosition npos, Match match);
-
+Parser<S, T> token_prim(PrettyPrint pretty_print, NextPosition npos,
+                        Match match);
 
 } // namespace cppparsec
 
