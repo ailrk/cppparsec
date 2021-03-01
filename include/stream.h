@@ -42,12 +42,25 @@ template <typename T> concept state_type = requires(T t) {
   { t.get_col() }
   ->std::convertible_to<size_t>;
 
-  { t.lookahead() }
-  ->std::convertible_to<std::optional<typename T::DataType>>;
+  // get a refrence of the underlying data type.
+  { t.uncons() }
+  ->std::convertible_to<
+
+      std::optional<
+
+          std::tuple<
+
+              typename T::ValueType,
+
+              typename T::StreamType
+
+              >>>;
 
   { t.get_position() }
   ->std::same_as<Position>;
 
+  // eat one element from the stream, return the unique pointer of the new
+  // stream.
   { t.eat() }
   ->std::same_as<std::unique_ptr<T>>;
 
@@ -64,7 +77,8 @@ class StringState {
 public:
   // update stream, return a new String Stream.
   // note because it just pass a string view, copy cost almost nothing.
-  using DataType = std::string_view;
+  using StreamType = std::string_view;
+  using ValueType = char;
   constexpr StringState(const std::string_view &s, const Position &pos)
       : data(s), position(pos) {}
 
@@ -88,8 +102,10 @@ public:
   constexpr size_t get_line() const;
   constexpr size_t get_col() const;
   constexpr Position get_position() const;
-  constexpr const std::optional<const std::string_view> lookahead() const;
 
+  constexpr std::optional<std::tuple<ValueType, StreamType>> uncons() const;
+
+  std::unique_ptr<StringState> eat(const Position &) const;
   std::unique_ptr<StringState> eat(size_t n) const;
   std::unique_ptr<StringState> eat() const;
 };
@@ -103,12 +119,13 @@ constexpr size_t StringState::get_col() const { return position.col; };
 constexpr Position StringState::get_position() const { return position; }
 
 // Return the underlying string view.
-constexpr const std::optional<const std::string_view>
-StringState::lookahead() const {
+
+constexpr std::optional<std::tuple<char, std::string_view>>
+StringState::uncons() const {
   if (is_empty()) {
     return {};
   }
-  return {data};
+  return std::make_tuple(data.at(0), data.substr(1));
 }
 
 // Eat the next n tokens, and return a new StringStream with
@@ -132,6 +149,21 @@ std::unique_ptr<StringState> StringState::eat(size_t n) const {
     return new_position;
   }());
 };
+
+// given a new position, eat until the current position is the same as the
+// new position.
+std::unique_ptr<StringState> StringState::eat(const Position &other_pos) const {
+  if (other_pos < position) {
+    return std::make_unique<StringState>(data);
+  }
+
+  while (position != other_pos) {
+    eat();
+  }
+
+  // TODO this one
+  return eat();
+}
 
 std::unique_ptr<StringState> StringState::eat() const { return eat(1); }
 } // namespace stream

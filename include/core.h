@@ -17,6 +17,9 @@ using namespace cppparsec::util;
 // The return type of a parser. It contains the grammar state (stream) and
 // parsed result. consumed and ok are used to indicate the state of the parser.
 template <stream::state_type S, typename T> class Reply {
+
+  // NOTE: This will be the value get passed to the next continuation in ok
+  // case.
 public:
   using type = T;
   using stream = T;
@@ -238,7 +241,7 @@ Parser<S, U> Parser<S, T>::bind(Fm fm) {
 
              {
 
-                 // cok
+                 // consumed and ok
                  [=](Reply<S, T> reply) {
                    assert(reply.value.has_value());
 
@@ -251,6 +254,7 @@ Parser<S, U> Parser<S, T>::bind(Fm fm) {
                      rep1.error = reply.error + rep1.error;
                      return cont.cok(rep1);
                    };
+
                    auto peerr = [=](ParseError e) {
                      ParseError error = reply.error + e;
                      return cont.cerr(error);
@@ -265,7 +269,7 @@ Parser<S, U> Parser<S, T>::bind(Fm fm) {
 
                  cont.cerr,
 
-                 // eok
+                 // not consumed and ok.
                  [=](Reply<S, T> reply) {
                    assert(reply.value.has_value());
 
@@ -276,6 +280,7 @@ Parser<S, U> Parser<S, T>::bind(Fm fm) {
                      rep1.error = reply.error + rep1.error;
                      return cont.eok(rep1);
                    };
+
                    auto peerr = [=](ParseError e) {
                      ParseError error = reply.error + e;
                      return cont.eerr(e);
@@ -305,18 +310,17 @@ Parser<S, U> Parser<S, T>::apply(M m) {
 
 // Identity for operator|. zerop will always fail and never consume input.
 template <stream::state_type S, typename T>
-Parser<S, T> zerop([]() {
-  // TODO
+Parser<S, T> zerop([](S state, ContinuationPack<S, T> cont) {
+  return cont.eerr(unknown_error(state));
 });
 
 // Identity for operator* open will not accept no input. This is purely for the
 // algebraic property...
 template <stream::state_type S, typename T>
-Parser<S, T> onep([]() {
-
+Parser<S, T> onep([](S state, ContinuationPack<S, T> cont) {
+  return cont.eerr(unknown_error(state));
 });
 
-// TODO not tested
 // Parse `m` first, if succeed, go though with the result. If failed try to
 // parse n with the current stream state. Note if `m` is failed and consumed
 // input, the input will not be rewind when parsing `n`.
@@ -359,12 +363,6 @@ Parser<S, T> operator*(Parser<S, T> p, Parser<S, T> q) {
 namespace cppparsec {
 // TODO
 
-// term parser.
-template <stream::state_type S, typename T>
-constexpr Parser<S, T> token(std::function<T(std::string)> pprint,
-                             std::function<Position(T)> pos,
-                             std::function<std::optional<T>(T)> parse);
-
 // Arbitrary lookahead.
 // Try parser p, if an error occurs it will rewind the stream back to the
 // previous state and pretent it didn't consume anything.
@@ -387,6 +385,42 @@ template <stream::state_type S, typename T>
 Parser<S, std::vector<T>>
 many_accum(std::function<std::vector<T>(T, std::vector<T>)> fn, Parser<S, T> p);
 
+// primitive term parser.
+template <stream::state_type S, typename T, typename PrettyPrint,
+          typename NextPosition, typename Match>
+Parser<S, T> token_prim(PrettyPrint pretty_print, NextPosition next_pos,
+                        Match match) {
+  using V = typename S::ValueType;
+  using D = typename S::StreamType;
+
+  // some constraints
+  static_assert(std::is_convertible_v<NextPosition,
+                                      std::function<Position(Position, V, S)>>);
+  static_assert(
+      std::is_convertible_v<PrettyPrint, std::function<std::string(V)>>);
+  static_assert(
+      std::is_convertible_v<Match, std::function<std::optional<T>(V)>>);
+
+  return Parser([=](S state, ContinuationPack<S, T> cont) {
+    std::optional<std::tuple<V, D>> r = state.uncons(); // fetch from stream.
+
+    if (!r.has_value()) {
+      return cont.eerr(unexpect_error(state));
+    }
+
+    auto [v, stream] = r.value();
+
+    if (match(v)) {
+      Position oldpos = state.get_position();
+      Position newpos = next_pos(oldpos, v, stream);
+      size_t dist = newpos - oldpos;
+      stream.eat();
+    } else {
+      return cont.error(unexpect_error(pvretty_print(v)));
+    }
+  });
+}
+
 // term parser
 //  PrettyPrint: std::function<std::string(U)>,  pretty printing fuction for the
 //  token.
@@ -394,12 +428,7 @@ many_accum(std::function<std::vector<T>(T, std::vector<T>)> fn, Parser<S, T> p);
 //  Match: std::functions<optional<T>(U)> matching function
 template <stream::state_type S, typename T, typename PrettyPrint,
           typename Position, typename Match>
-Parser<S, T> token(PrettyPrint pretty_print, Position position, Match match);
-
-template <stream::state_type S, typename T, typename PrettyPrint,
-          typename NextPosition, typename Match>
-Parser<S, T> token_prim(PrettyPrint pretty_print, NextPosition npos,
-                        Match match);
+Parser<S, T> token(PrettyPrint pretty_print, Position position, Match match){};
 
 } // namespace cppparsec
 

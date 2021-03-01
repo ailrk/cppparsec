@@ -2,4 +2,5 @@
 #pragma once
 #include "core.h"
 
-namespace cppparsec {} // namespace cppparsec
+namespace cppparsec {
+} // namespace cppparsec

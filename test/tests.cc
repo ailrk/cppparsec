@@ -13,20 +13,24 @@ TEST_CASE("Create StirngState", "StringState") {
   REQUIRE(s.get_col() == 1);
   REQUIRE(s.get_line() == 1);
   REQUIRE(!s.is_empty());
-  REQUIRE(s.lookahead()->at(0) == 'a');
+
+  auto [v, _] = s.uncons().value();
+  REQUIRE(v == 'a');
 
   SECTION("eat 1 token") {
     auto new_s = s.eat();
-    REQUIRE(new_s->lookahead()->at(0) == 'b');
+    auto [v, st] = new_s->uncons().value();
+    REQUIRE(v == 'b');
     REQUIRE(new_s->get_col() == 2);
     REQUIRE(new_s->get_line() == 1);
   }
 
   SECTION("eat till the next line") {
     auto new_s = s.eat(5);
+    auto [v, st] = new_s->uncons().value();
     REQUIRE(new_s->get_line() == 2);
     REQUIRE(new_s->get_col() == 2);
-    REQUIRE(new_s->lookahead()->at(0) == 'e');
+    REQUIRE(v == 'e');
   }
 
   SECTION("test StringStream copy constructor") {
@@ -38,7 +42,8 @@ TEST_CASE("Create StirngState", "StringState") {
 
   SECTION("const expr test") {
     constexpr StringState s1("abc\ndef\nghi\n");
-    REQUIRE(s1.lookahead().value().at(0) == 'a');
+    auto [v, st] = s1.uncons().value();
+    REQUIRE(v == 'a');
   }
 }
 
@@ -184,6 +189,5 @@ TEST_CASE("apply") {
     REQUIRE(r.value.value() == 99);
   }
 
-  SECTION("apply 2") {
-  }
+  SECTION("apply 2") {}
 }
