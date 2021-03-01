@@ -386,16 +386,15 @@ Parser<S, std::vector<T>>
 many_accum(std::function<std::vector<T>(T, std::vector<T>)> fn, Parser<S, T> p);
 
 // primitive term parser.
+// privide customized pretty printer, because we might want to print the same
+// data in different way.
 template <stream::state_type S, typename T, typename PrettyPrint,
-          typename NextPosition, typename Match>
-Parser<S, T> token_prim(PrettyPrint pretty_print, NextPosition next_pos,
-                        Match match) {
+          typename Match>
+Parser<S, T> token_prim(PrettyPrint pretty_print, Match match) {
   using V = typename S::ValueType;
   using D = typename S::StreamType;
 
   // some constraints
-  static_assert(std::is_convertible_v<NextPosition,
-                                      std::function<Position(Position, V, S)>>);
   static_assert(
       std::is_convertible_v<PrettyPrint, std::function<std::string(V)>>);
   static_assert(
@@ -408,15 +407,14 @@ Parser<S, T> token_prim(PrettyPrint pretty_print, NextPosition next_pos,
       return cont.eerr(unexpect_error(state));
     }
 
+    // peak the first element.
     auto [v, stream] = r.value();
 
     if (match(v)) {
-      Position oldpos = state.get_position();
-      Position newpos = next_pos(oldpos, v, stream);
-      size_t dist = newpos - oldpos;
-      stream.eat();
+      Position newpos = state.next_position();
+      state.eat(newpos);
     } else {
-      return cont.error(unexpect_error(pvretty_print(v)));
+      return cont.error(unexpect_error(pretty_print(v)));
     }
   });
 }
@@ -428,7 +426,7 @@ Parser<S, T> token_prim(PrettyPrint pretty_print, NextPosition next_pos,
 //  Match: std::functions<optional<T>(U)> matching function
 template <stream::state_type S, typename T, typename PrettyPrint,
           typename Position, typename Match>
-Parser<S, T> token(PrettyPrint pretty_print, Position position, Match match){};
+Parser<S, T> token(PrettyPrint pretty_print, Position position, Match match) {}
 
 } // namespace cppparsec
 

@@ -59,10 +59,17 @@ template <typename T> concept state_type = requires(T t) {
   { t.get_position() }
   ->std::same_as<Position>;
 
+  // TODO might also want to constrain overloads.
+  // .1 eat(size_t n),
+  // .2 eat(Position n)
   // eat one element from the stream, return the unique pointer of the new
   // stream.
   { t.eat() }
   ->std::same_as<std::unique_ptr<T>>;
+
+  // calculate the next position of the token.
+  { t.next_position() }
+  ->std::same_as<Position>;
 
   { t.is_empty() }
   ->std::same_as<bool>;
@@ -102,6 +109,8 @@ public:
   constexpr size_t get_line() const;
   constexpr size_t get_col() const;
   constexpr Position get_position() const;
+  constexpr Position next_position() const;
+  constexpr Position next_position(size_t) const;
 
   constexpr std::optional<std::tuple<ValueType, StreamType>> uncons() const;
 
@@ -118,8 +127,30 @@ constexpr size_t StringState::get_col() const { return position.col; };
 
 constexpr Position StringState::get_position() const { return position; }
 
-// Return the underlying string view.
+// the next position after taken n elements.
+constexpr Position StringState::next_position(size_t n) const {
+  if (is_empty()) {
+    return position;
+  }
 
+  Position new_position = position;
+
+  for (size_t i = 0; i < n; ++i) {
+    if (data[i] == '\n') {
+      new_position.line++;
+      new_position.col = 1;
+    } else {
+      new_position.col++;
+    }
+  }
+  return new_position;
+}
+
+constexpr Position StringState::next_position() const {
+  return next_position(1);
+}
+
+// Return the first element and the rest stream.
 constexpr std::optional<std::tuple<char, std::string_view>>
 StringState::uncons() const {
   if (is_empty()) {
@@ -131,23 +162,7 @@ StringState::uncons() const {
 // Eat the next n tokens, and return a new StringStream with
 // updated position.
 std::unique_ptr<StringState> StringState::eat(size_t n) const {
-  return std::make_unique<StringState>(data.substr(n), [&]() {
-    if (is_empty()) {
-      return position;
-    }
-
-    Position new_position = position;
-
-    for (size_t i = 0; i < n; ++i) {
-      if (data[i] == '\n') {
-        new_position.line++;
-        new_position.col = 1;
-      } else {
-        new_position.col++;
-      }
-    }
-    return new_position;
-  }());
+  return std::make_unique<StringState>(data.substr(n), next_position(n));
 };
 
 // given a new position, eat until the current position is the same as the
@@ -157,12 +172,11 @@ std::unique_ptr<StringState> StringState::eat(const Position &other_pos) const {
     return std::make_unique<StringState>(data);
   }
 
-  while (position != other_pos) {
-    eat();
-  }
+  std::unique_ptr<StringState> res = nullptr;
+  for (; position != other_pos; res = eat())
+    ;
 
-  // TODO this one
-  return eat();
+  return res;
 }
 
 std::unique_ptr<StringState> StringState::eat() const { return eat(1); }
