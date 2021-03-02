@@ -83,7 +83,7 @@ using ErrContinuation = std::function<bool(ParseError)>;
 // Instead of passing one continuation, we have four different continuations
 // for four possible parser states.
 // The struct is to make passing continuation easier.
-template <stream::state_type S, typename T> struct ContinuationPack {
+template <stream::state_type S, typename T> struct Conts {
 
   OkContinuation<S, T> cok;
   ErrContinuation cerr;
@@ -93,7 +93,7 @@ template <stream::state_type S, typename T> struct ContinuationPack {
 };
 
 template <stream::state_type S, typename T>
-using ParserFn = std::function<bool(S, ContinuationPack<S, T>)>;
+using ParserFn = std::function<bool(S, Conts<S, T>)>;
 
 template <stream::state_type S, typename T> class Parser;
 
@@ -121,7 +121,7 @@ public:
   Reply<S, T> operator()(const S &state);
 
   static Parser<S, T> pure(T a) {
-    return Parser([=](S state, ContinuationPack<S, T> cont) {
+    return Parser([=](S state, Conts<S, T> cont) {
       Reply<S, T> r = Reply<S, T>::mk_eok_reply(a, state, unknown_error(state));
       return cont.eok(r);
     });
@@ -142,7 +142,7 @@ public:
 
   // create parser from a transition function. low level helper.
   static Parser<S, T> create(std::function<Reply<S, T>(S)> transition) {
-    return Parser([transition](S state, ContinuationPack<S, T> cont) {
+    return Parser([transition](S state, Conts<S, T> cont) {
       Reply<S, T> r = transition(state);
       assert((r.ok && r.value != std::nullopt) ||
              (!r.ok && r.value == std::nullopt));
@@ -209,7 +209,7 @@ template <typename Fn, typename U>
 Parser<S, U> Parser<S, T>::map(const Fn &fn) {
 
   return Parser<S, U>(
-      [fn, p = unparser](const S &state, const ContinuationPack<S, U> &cont) {
+      [fn, p = unparser](const S &state, const Conts<S, U> &cont) {
         auto mapped_ok = [&cont, &fn](Reply<S, T> reply) {
           cont.cok(reply.map(fn));
           return reply.ok;
@@ -238,7 +238,7 @@ template <typename Fm, typename P, typename U>
 Parser<S, U> Parser<S, T>::bind(Fm fm) {
   static_assert(std::is_convertible_v<Fm, std::function<Parser<S, U>(T)>>);
 
-  return Parser<S, U>([=, p = unparser](S state, ContinuationPack<S, U> cont) {
+  return Parser<S, U>([=, p = unparser](S state, Conts<S, U> cont) {
     return p(state,
 
              {
@@ -315,14 +315,14 @@ Parser<S, U> Parser<S, T>::apply(M m) {
 
 // Identity for operator|. zerop will always fail and never consume input.
 template <stream::state_type S, typename T>
-Parser<S, T> zerop([](S state, ContinuationPack<S, T> cont) {
+Parser<S, T> zerop([](S state, Conts<S, T> cont) {
   return cont.eerr(unknown_error(state));
 });
 
 // Identity for operator* open will not accept no input. This is purely for the
 // algebraic property...
 template <stream::state_type S, typename T>
-Parser<S, T> onep([](S state, ContinuationPack<S, T> cont) {
+Parser<S, T> onep([](S state, Conts<S, T> cont) {
   return cont.eerr(unknown_error(state));
 });
 
@@ -331,7 +331,7 @@ Parser<S, T> onep([](S state, ContinuationPack<S, T> cont) {
 // input, the input will not be rewind when parsing `n`.
 template <stream::state_type S, typename T>
 Parser<S, T> Parser<S, T>::alt(Parser<S, T> n) {
-  return Parser([=, m = unparser](S state, ContinuationPack<S, T> cont) {
+  return Parser([=, m = unparser](S state, Conts<S, T> cont) {
     auto meerr = [=](ParseError error) { // when m fails, parse n.
       auto neok = [=](Reply<S, T> reply) {
         reply.error = reply.error + error;
@@ -369,8 +369,8 @@ namespace cppparsec {
 // Try parser p, if an error occurs it will rewind the stream back to the
 // previous state and pretent it didn't consume anything.
 template <stream::state_type S, typename T>
-constexpr Parser<S, T> attempt(Parser<S, T> p) {
-  return Parser([=](S state, ContinuationPack<S, T> cont) {
+Parser<S, T> attempt(Parser<S, T> p) {
+  return Parser([=](S state, Conts<S, T> cont) {
     return p.unparser(state, {cont.cok, cont.eerr, cont.eok, cont.eerr});
   });
 }
@@ -379,8 +379,8 @@ constexpr Parser<S, T> attempt(Parser<S, T> p) {
 // Try parser p, if success, don't consume input. If p failed and consumed some
 // input, so does (lookAhead p).
 template <stream::state_type S, typename T>
-constexpr Parser<S, T> look_ahead(Parser<S, T> p) {
-  return Parser([=](S state, ContinuationPack<S, T> cont) {
+Parser<S, T> look_ahead(Parser<S, T> p) {
+  return Parser([=](S state, Conts<S, T> cont) {
     auto eok1 = [=](Reply<S, T> reply) {
       Reply<S, T> rep1{reply};
       rep1.error = unknown_error(state);
@@ -392,22 +392,16 @@ constexpr Parser<S, T> look_ahead(Parser<S, T> p) {
 
 // parse `p` zero or more times.
 template <stream::state_type S, typename T>
-constexpr Parser<S, std::vector<T>> many(Parser<S, T> p);
+Parser<S, std::vector<T>> many(Parser<S, T> p) {
+
+  return Parser([=](S state, Conts<S, std::vector<T>> cont) {
+
+  });
+}
 
 // skip many and return nothing.
 template <stream::state_type S, typename T>
 Parser<S, std::monostate> skip_many(Parser<S, T> p);
-
-//
-template <stream::state_type S, typename T>
-Parser<S, std::vector<T>>
-many_accum(std::function<std::vector<T>(T, std::vector<T>)> fn,
-           Parser<S, T> p) {
-  // TODO many_accum, implement walk.
-  return Parser([=](S state, ContinuationPack<S, T> cont) {
-
-  });
-}
 
 // primitive term parser.
 // Takes a customized pretty printer, because we might want to use different
@@ -424,7 +418,7 @@ Parser<S, T> token(PrettyPrint pretty_print, Match match) {
   static_assert(
       std::is_convertible_v<Match, std::function<std::optional<T>(V)>>);
 
-  return Parser([=](S state, ContinuationPack<S, T> cont) {
+  return Parser([=](S state, Conts<S, T> cont) {
     std::optional<std::tuple<V, D>> r = state.uncons(); // fetch from stream.
 
     if (!r.has_value()) {
@@ -446,17 +440,48 @@ Parser<S, T> token(PrettyPrint pretty_print, Match match) {
 // some error handling utilities.
 namespace cppparsec {
 
+static void add_expected_message(ParseError &error,
+                                 const std::vector<std::string> &msgs) {
+  if (!error.is_unkown_error()) {
+    if (msgs.size() == 0) {
+      error.add_message({ParseError::Error::Expect, ""});
+    } else if (msgs.size() == 1) {
+      error.add_message({ParseError::Error::Expect, msgs[0]});
+    } else {
+      for (auto &msg : msgs) {
+        error.add_message({ParseError::Error::Expect, msg});
+      }
+    }
+  }
+}
+
+// replce error message with msgs
 template <stream::state_type S, typename T>
-static Parser<S, T> labels(Parser<S, T> p, std::vector<std::string> msgs) {
-  return Parser([=](S state, ContinuationPack<S, T>) {
-    // TODO
+Parser<S, T> labels(Parser<S, T> p, const std::vector<std::string> &msgs) {
+  return Parser([=](S state, Conts<S, T> cont) {
+    auto eok1 = [=](Reply<S, T> reply) {
+      Reply<S, T> rep1(reply);
+      ParseError &error = rep1.error;
+
+      add_expected_message(error, msgs);
+      return cont.eok(rep1);
+    };
+
+    auto eerr1 = [=](ParseError error) {
+      add_expected_message(error, msgs);
+      return cont.eerr(error);
+    };
+
+    return p.unparser(state, {cont.cok, cont.cerr, cont.eok1, eerr1});
   });
 }
 
+// behave like p, but replace the error message with `msg`.
 template <stream::state_type S, typename T>
 Parser<S, T> label(Parser<S, T> p, std::string msg) {
-  // TODO
+  return labels(p, {msg});
 }
+
 } // namespace cppparsec
 
 // some debuggin utilities

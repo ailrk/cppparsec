@@ -1,4 +1,5 @@
 #include "stream.h"
+#include <algorithm>
 #include <concepts>
 #include <iostream>
 #include <optional>
@@ -78,7 +79,11 @@ public:
   void set_position(Position pos) { position = pos; }
   Position get_position() const { return position; }
 
-  void add_message(Message message) { messages.push_back(message); }
+  //
+  void add_message(Message message) {
+    messages.erase(std::remove(messages.begin(), messages.end(), message));
+    messages.push_back(message);
+  }
 
   // prett print full error message.
   // TODO pretty printing
