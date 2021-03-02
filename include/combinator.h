@@ -98,11 +98,32 @@ namespace cppparsec {
 
 using namespace stream;
 
-inline Parser<StringState, char> satisfy;
-inline Parser<StringState, char> one_of(std::vector<char> chars);
-inline Parser<StringState, char> none_of(std::vector<char> chars);
-inline Parser<StringState, std::monostate> spaces;
-inline Parser<StringState, char> space;
+// success if parsed character satisfies the predicate.
+inline Parser<StringState, char> satisfy(std::function<bool(char)> pred) {
+  return token<StringState, char>(
+      [=](char c) { return std::string(1, c); },
+      [=](char c) { return pred(c) ? std::optional{c} : std::nullopt; });
+}
+
+inline Parser<StringState, char> one_of(std::vector<char> chars) {
+  return satisfy([=](char c) {
+    auto iter = std::find(chars.begin(), chars.end(), c);
+    return iter == chars.end();
+  });
+}
+
+inline Parser<StringState, char> none_of(std::vector<char> chars) {
+  return satisfy([=](char c) {
+    auto iter = std::find(chars.begin(), chars.end(), c);
+    return iter != chars.end();
+  });
+}
+
+inline Parser<StringState, char> space =
+    satisfy([](char c) { return isspace(c); });
+
+inline Parser<StringState, std::monostate> spaces = skip_many(space);
+
 inline Parser<StringState, char> newline;
 inline Parser<StringState, char> crlf;
 inline Parser<StringState, char> endofline;

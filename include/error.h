@@ -34,6 +34,10 @@ public:
   ParseError(const Position &position, const Messages &messages)
       : position(position), messages(messages) {}
 
+  // if the messages is empty
+  bool empty() { return messages.empty(); }
+  bool is_unkown_error() { return empty(); }
+
   // merge errors to get a new error.
   friend ParseError operator+(const ParseError &e1, const ParseError &e2) {
     if (!e1.messages.empty() && e2.messages.empty()) {

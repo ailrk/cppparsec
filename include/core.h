@@ -11,6 +11,8 @@
 #include <vector>
 
 namespace cppparsec {
+// The program is cps transformed, so it might take a little bit
+// dicipher works to read.
 
 using namespace cppparsec::util;
 
@@ -302,8 +304,11 @@ template <stream::state_type S, typename T>
 template <typename M, typename Fn, typename U>
 Parser<S, U> Parser<S, T>::apply(M m) {
 
-  auto p1 = *this >>=
-      [=](T v) { return m >>= [=](Fn fn) { return pure(fn(v)); }; };
+  auto p1 = *this >>= [=](T v) {
+    return m >>= [=](Fn fn) { // pure
+      return pure(fn(v));
+    };
+  };
 
   return p1;
 }
@@ -334,10 +339,8 @@ Parser<S, T> Parser<S, T>::alt(Parser<S, T> n) {
       };
 
       auto neerr = [=](ParseError error1) { return cont.eerr(error + error1); };
-
       return n.unparser(state, {cont.cok, cont.cerr, neok, neerr});
     };
-
     return p(state, {cont.cok, cont.cerr, cont.eok, meerr});
   });
 }
@@ -362,15 +365,30 @@ Parser<S, T> operator*(Parser<S, T> p, Parser<S, T> q) {
 // define some core utilities.
 namespace cppparsec {
 
-// Arbitrary lookahead.
+// Rewind on failure.
 // Try parser p, if an error occurs it will rewind the stream back to the
 // previous state and pretent it didn't consume anything.
 template <stream::state_type S, typename T>
-constexpr Parser<S, T> attempt(Parser<S, T> p);
+constexpr Parser<S, T> attempt(Parser<S, T> p) {
+  return Parser([=](S state, ContinuationPack<S, T> cont) {
+    return p.unparser(state, {cont.cok, cont.eerr, cont.eok, cont.eerr});
+  });
+}
 
-// Parse `p` without consume any input.
+// Rewind on success.
+// Try parser p, if success, don't consume input. If p failed and consumed some
+// input, so does (lookAhead p).
 template <stream::state_type S, typename T>
-constexpr Parser<S, T> look_ahead(Parser<S, T> p);
+constexpr Parser<S, T> look_ahead(Parser<S, T> p) {
+  return Parser([=](S state, ContinuationPack<S, T> cont) {
+    auto eok1 = [=](Reply<S, T> reply) {
+      Reply<S, T> rep1{reply};
+      rep1.error = unknown_error(state);
+      return cont.eok(rep1);
+    };
+    return p.unparser(state, {eok1, cont.cerr, eok1, cont.eerr});
+  });
+}
 
 // parse `p` zero or more times.
 template <stream::state_type S, typename T>
@@ -380,6 +398,7 @@ constexpr Parser<S, std::vector<T>> many(Parser<S, T> p);
 template <stream::state_type S, typename T>
 Parser<S, std::monostate> skip_many(Parser<S, T> p);
 
+//
 template <stream::state_type S, typename T>
 Parser<S, std::vector<T>>
 many_accum(std::function<std::vector<T>(T, std::vector<T>)> fn,
@@ -412,8 +431,7 @@ Parser<S, T> token(PrettyPrint pretty_print, Match match) {
       return cont.eerr(unexpect_error(state));
     }
 
-    // peak the first element.
-    auto [v, stream] = r.value();
+    auto [v, stream] = r.value(); // peek
     if (match(v)) {
       Position newpos = state.next_position();
       state.eat(newpos);
@@ -423,6 +441,22 @@ Parser<S, T> token(PrettyPrint pretty_print, Match match) {
   });
 }
 
+} // namespace cppparsec
+
+// some error handling utilities.
+namespace cppparsec {
+
+template <stream::state_type S, typename T>
+static Parser<S, T> labels(Parser<S, T> p, std::vector<std::string> msgs) {
+  return Parser([=](S state, ContinuationPack<S, T>) {
+
+  });
+}
+
+template <stream::state_type S, typename T>
+Parser<S, T> label(Parser<S, T> p, std::string msg) {
+  // TODO
+}
 } // namespace cppparsec
 
 // some debuggin utilities
