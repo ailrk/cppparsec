@@ -76,7 +76,7 @@ public:
   void add_message(Message message) { messages.push_back(message); }
 
   // prett print full error message.
-  // TODO
+  // TODO pretty printing
   std::string show_error_mesage();
 
   // show function

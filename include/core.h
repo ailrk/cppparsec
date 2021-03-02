@@ -361,7 +361,6 @@ Parser<S, T> operator*(Parser<S, T> p, Parser<S, T> q) {
 
 // define some core utilities.
 namespace cppparsec {
-// TODO
 
 // Arbitrary lookahead.
 // Try parser p, if an error occurs it will rewind the stream back to the
@@ -383,14 +382,20 @@ Parser<S, std::monostate> skip_many(Parser<S, T> p);
 
 template <stream::state_type S, typename T>
 Parser<S, std::vector<T>>
-many_accum(std::function<std::vector<T>(T, std::vector<T>)> fn, Parser<S, T> p);
+many_accum(std::function<std::vector<T>(T, std::vector<T>)> fn,
+           Parser<S, T> p) {
+  // TODO many_accum, implement walk.
+  return Parser([=](S state, ContinuationPack<S, T> cont) {
+
+  });
+}
 
 // primitive term parser.
-// privide customized pretty printer, because we might want to print the same
-// data in different way.
+// Takes a customized pretty printer, because we might want to use different
+// printer or the same
 template <stream::state_type S, typename T, typename PrettyPrint,
           typename Match>
-Parser<S, T> token_prim(PrettyPrint pretty_print, Match match) {
+Parser<S, T> token(PrettyPrint pretty_print, Match match) {
   using V = typename S::ValueType;
   using D = typename S::StreamType;
 
@@ -409,7 +414,6 @@ Parser<S, T> token_prim(PrettyPrint pretty_print, Match match) {
 
     // peak the first element.
     auto [v, stream] = r.value();
-
     if (match(v)) {
       Position newpos = state.next_position();
       state.eat(newpos);
@@ -418,15 +422,6 @@ Parser<S, T> token_prim(PrettyPrint pretty_print, Match match) {
     }
   });
 }
-
-// term parser
-//  PrettyPrint: std::function<std::string(U)>,  pretty printing fuction for the
-//  token.
-//  Position: std::functions<Position(U)>,    getting the position of the token.
-//  Match: std::functions<optional<T>(U)> matching function
-template <stream::state_type S, typename T, typename PrettyPrint,
-          typename Position, typename Match>
-Parser<S, T> token(PrettyPrint pretty_print, Position position, Match match) {}
 
 } // namespace cppparsec
 

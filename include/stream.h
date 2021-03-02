@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <concepts>
+#include <iostream>
 #include <memory>
 #include <optional>
 #include <string_view>
@@ -13,12 +14,22 @@ struct Position {
   size_t line;
   size_t col;
 
+  std::string to_string() {
+    std::string res = "line: ";
+    res += std::to_string(line);
+    res += ", ";
+    res += "col: ";
+    res += std::to_string(col);
+
+    return res;
+  }
+
   [[nodiscard]] friend bool operator<(const Position &p1, const Position &p2) {
-    return (p1.line < p2.line) || (p1.col < p2.col);
+    return p1 != p2 && !(p1 > p2);
   }
 
   [[nodiscard]] friend bool operator>(const Position &p1, const Position &p2) {
-    return (p1.line > p2.line) || (p1.col > p2.col);
+    return (p1.line > p2.line) || ((p1.line == p2.line) && (p1.col > p2.col));
   }
 
   [[nodiscard]] friend bool operator==(const Position &p1, const Position &p2) {
@@ -52,9 +63,7 @@ template <typename T> concept state_type = requires(T t) {
 
               typename T::ValueType,
 
-              typename T::StreamType
-
-              >>>;
+              typename T::StreamType>>>;
 
   { t.get_position() }
   ->std::same_as<Position>;
@@ -114,7 +123,7 @@ public:
 
   constexpr std::optional<std::tuple<ValueType, StreamType>> uncons() const;
 
-  std::unique_ptr<StringState> eat(const Position &) const;
+  std::unique_ptr<StringState> eat(Position) const;
   std::unique_ptr<StringState> eat(size_t n) const;
   std::unique_ptr<StringState> eat() const;
 };
@@ -128,8 +137,9 @@ constexpr size_t StringState::get_col() const { return position.col; };
 constexpr Position StringState::get_position() const { return position; }
 
 // the next position after taken n elements.
+// when n =  0 return the same position;
 constexpr Position StringState::next_position(size_t n) const {
-  if (is_empty()) {
+  if (is_empty() && n == 0) {
     return position;
   }
 
@@ -162,19 +172,34 @@ StringState::uncons() const {
 // Eat the next n tokens, and return a new StringStream with
 // updated position.
 std::unique_ptr<StringState> StringState::eat(size_t n) const {
-  return std::make_unique<StringState>(data.substr(n), next_position(n));
+  if (n == 0) {
+    return std::make_unique<StringState>(*this);
+  } else {
+    return std::make_unique<StringState>(data.substr(n), next_position(n));
+  }
 };
 
 // given a new position, eat until the current position is the same as the
 // new position.
-std::unique_ptr<StringState> StringState::eat(const Position &other_pos) const {
+std::unique_ptr<StringState> StringState::eat(Position other_pos) const {
   if (other_pos < position) {
     return std::make_unique<StringState>(data);
   }
 
-  std::unique_ptr<StringState> res = nullptr;
-  for (; position != other_pos; res = eat())
-    ;
+  // accumulator
+  std::unique_ptr<StringState> res = std::make_unique<StringState>(*this);
+  Position pos = position;
+
+  assert(res != nullptr);
+
+  // TODO now is on over
+  for (; pos != other_pos; res = res->eat()) {
+    pos = res->get_position();
+
+    if (pos > other_pos) { // other_pos doesn't exist.
+      return eat(0);
+    }
+  }
 
   return res;
 }

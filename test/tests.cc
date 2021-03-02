@@ -45,6 +45,37 @@ TEST_CASE("Create StirngState", "StringState") {
     auto [v, st] = s1.uncons().value();
     REQUIRE(v == 'a');
   }
+
+  SECTION("next_position") {
+    using cppparsec::Position;
+    constexpr StringState s1("abc\ndef\nghi\n");
+    Position pos = s1.next_position();
+
+    REQUIRE(pos.line == 1);
+    REQUIRE(pos.col == 2);
+
+    pos = s1.next_position(5);
+
+    REQUIRE(pos.line == 2);
+    REQUIRE(pos.col == 2);
+  }
+
+  SECTION("eat until position") {
+    using cppparsec::Position;
+    constexpr StringState s1("abc\ndef\nghi\n");
+    Position pos{3, 2};
+    auto s2 = s1.eat(pos);
+    std::cout << s2->get_position().to_string() << std::endl;
+  }
+
+  SECTION("next position with eat") {
+    using cppparsec::Position;
+    constexpr StringState s1("abc\ndef\nghi\n");
+    Position pos = s1.next_position(4);
+    std::cout << "pos: " << pos.to_string() << std::endl;
+    auto s2 = s1.eat(pos);
+    std::cout << s2->get_position().to_string() << std::endl;
+  }
 }
 
 TEST_CASE("parser basis") {

@@ -72,7 +72,6 @@ Parser<S, std::vector<T>> sepend_by(Parser<S, T> p, Parser<S, SepEnd> sepend);
 template <stream::state_type S, typename T, typename SepEnd>
 Parser<S, std::vector<T>> sepend_by1(Parser<S, T> p, Parser<S, SepEnd> sepend);
 
-// TODO
 template <stream::state_type S, typename T>
 Parser<S, T> chainl(Parser<S, T> p, Parser<S, std::function<T(T, T)>> fn, T t);
 
