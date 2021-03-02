@@ -50,6 +50,7 @@ public:
       Messages msg{};
       msg.insert(msg.end(), e1.messages.begin(), e1.messages.end());
       msg.insert(msg.end(), e2.messages.begin(), e2.messages.end());
+
       return ParseError{e1.position, msg};
     } else if (e1.position > e2.position) {
       return e1;
