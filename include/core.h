@@ -207,12 +207,12 @@ Reply<S, T> Parser<S, T>::operator()(const S &state) {
 template <stream::state_type S, typename T>
 template <typename Fn, typename U>
 Parser<S, U> Parser<S, T>::map(const Fn &fn) {
+  static_assert(std::is_convertible_v<Fn, std::function<U(T)>>);
 
   return Parser<S, U>(
       [fn, p = unparser](const S &state, const Conts<S, U> &cont) {
         auto mapped_ok = [&cont, &fn](Reply<S, T> reply) {
-          cont.cok(reply.map(fn));
-          return reply.ok;
+          return cont.cok(reply.map(fn));
         };
 
         return p(state,
@@ -395,7 +395,16 @@ template <stream::state_type S, typename T>
 Parser<S, std::vector<T>> many(Parser<S, T> p) {
 
   return Parser([=](S state, Conts<S, std::vector<T>> cont) {
+    std::vector<T> result;
 
+    // TODO how to repeatively parse p until fair without using
+    // continuation or straight recurison?
+    // how to parsing a same operation many times?
+    auto pcok = [&result, cont](Reply<S, T> reply) {};
+
+    auto peok = [&result, cont](Reply<S, T> reply) {};
+
+    return p.unparser(state, {pcok, cont.cerr, peok, cont.eerr});
   });
 }
 
