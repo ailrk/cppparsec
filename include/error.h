@@ -114,4 +114,14 @@ template <stream::state_type S> ParseError unknown_error(S state) {
   return ParseError(state.get_position(), {});
 }
 
+// throw when many is used with a parser that accepts an emtpy string.
+class bad_many_combinator : public std::exception {
+
+public:
+  const char *what() const noexcept override {
+    return "the combinator `many` cannot be used with a parser "
+           "that accept an empty string";
+  }
+};
+
 } // namespace cppparsec

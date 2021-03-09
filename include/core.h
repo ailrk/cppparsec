@@ -458,16 +458,16 @@ template <stream::state_type S, typename T, typename AccumFn>
 Parser<S, std::vector<T>> many_accum(AccumFn fn, Parser<S, T> p) {
 
   static_assert(
-      std::is_convertible_v<AccumFn, std::function<T(T, std::vector<T>)>>,
+      std::is_convertible_v<AccumFn,
+                            std::function<std::vector<T>(T, std::vector<T>)>>,
       "AccumFn has the wrong type");
 
-  return Parser([=](S state, Conts<S, std::vector<T>> cont) {
-    std::function<Parser<S, std::vector<T>>(std::vector<T> acc,
-                                            Reply<S, T> reply)>
-        walk;
-
+  return Parser<S, std::vector<T>>([=](S state, Conts<S, std::vector<T>> cont) {
     // TODO: Now all vector are copied. handle this later.
     // recursively accumulate result from p
+
+    std::function<bool(std::vector<T> acc, Reply<S, T> reply)> walk;
+
     walk = [=](std::vector<T> acc, Reply<S, T> reply) {
       return p.unparser(
 
@@ -475,8 +475,7 @@ Parser<S, std::vector<T>> many_accum(AccumFn fn, Parser<S, T> p) {
 
           {.consumed_ok = [=](Reply<S, T> reply) -> bool {
              auto v = reply.value.value();
-             acc = fn(v, acc);
-             walk(acc, reply);
+             walk(fn(v, acc), reply);
              return reply.ok;
            },
 
@@ -486,9 +485,13 @@ Parser<S, std::vector<T>> many_accum(AccumFn fn, Parser<S, T> p) {
            // you should not allow a parser accepts empty string to be ran
            // multiple times.
            //
-           // We just pipe it to empty_err and return a empty
-           // vector.
-           .empty_ok = cont.empty_err,
+           // TODO gracefully handle this case.
+
+           .empty_ok =
+               [](Reply<S, T> reply) {
+                 throw bad_many_combinator();
+                 return reply.ok;
+               },
 
            .empty_err = [=](ParseError error) -> bool {
              Reply<S, std::vector<T>> rep1;
@@ -506,14 +509,20 @@ Parser<S, std::vector<T>> many_accum(AccumFn fn, Parser<S, T> p) {
         state,
 
         {.consumed_ok = [=](Reply<S, T> reply) -> bool {
-           return walk({}, reply);
+           walk({}, reply);
+           return reply.ok;
          },
 
          .consumed_err = cont.consumed_err,
-         .empty_ok = cont.empty_ok,
+
+         .empty_ok = [](Reply<S, T> reply) -> bool {
+           throw bad_many_combinator();
+           return reply.ok;
+         },
 
          .empty_err = [=](ParseError error) -> bool {
-           auto reply = Reply<S, std::vector<T>>::mk_empty_ok_reply();
+           auto reply =
+               Reply<S, std::vector<T>>::mk_empty_ok_reply({{}}, state, error);
            return cont.empty_ok(reply);
          }
 
@@ -522,8 +531,9 @@ Parser<S, std::vector<T>> many_accum(AccumFn fn, Parser<S, T> p) {
 }
 
 // parse `p` zero or more times.
-template <stream::state_type S, typename T>
-Parser<S, std::vector<T>> many = [](Parser<S, T> p) {
+template <typename P, typename S = typename parser_trait<P>::stream,
+          typename T = typename parser_trait<P>::type>
+Parser<S, std::vector<T>> many(Parser<S, T> p) {
   return many_accum(
       [](T v, std::vector<T> acc) {
         acc.push_back(v);
@@ -534,8 +544,11 @@ Parser<S, std::vector<T>> many = [](Parser<S, T> p) {
 
 // TODO: now just make a new empty vector. try to reuse empty acc instead.
 // skip many and return nothing.
-template <stream::state_type S, typename T>
-Parser<S, std::monostate> skip_many = [](Parser<S, T> p) {
+template <typename P,
+
+          typename S = typename parser_trait<P>::stream,
+          typename T = typename parser_trait<P>::type>
+Parser<S, std::monostate> skip_many(P p) {
   return many_accum([](T v, std::vector<T> acc) { return std::vector<T>{}; },
                     p) >>
          Parser<S, std::monostate>::pure({});
@@ -644,6 +657,12 @@ Parser<S, T> labels(Parser<S, T> p, const std::vector<std::string> &msgs) {
 template <stream::state_type S, typename T>
 Parser<S, T> label(Parser<S, T> p, std::string msg) {
   return labels(p, {msg});
+}
+
+// behave like p, but replace the error message with `msg`.
+template <stream::state_type S, typename T>
+Parser<S, T> operator^(Parser<S, T> p, std::string msg) {
+  return label(p, {msg});
 }
 
 } // namespace cppparsec

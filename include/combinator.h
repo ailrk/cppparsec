@@ -105,6 +105,12 @@ inline Parser<StringState, char> satisfy(std::function<bool(char)> pred) {
       [=](char c) { return pred(c) ? std::optional{c} : std::nullopt; });
 }
 
+// parse a single character `c`
+inline Parser<StringState, char> ch(char c) {
+  return satisfy([=](char o) { return o == c; }) ^ std::string(1, c);
+}
+
+// parse one of the character in the vector `chars`
 inline Parser<StringState, char> one_of(std::vector<char> chars) {
   return satisfy([=](char c) {
     auto iter = std::find(chars.begin(), chars.end(), c);
@@ -112,6 +118,7 @@ inline Parser<StringState, char> one_of(std::vector<char> chars) {
   });
 }
 
+// parse the next character if it's not in the vector `chars`
 inline Parser<StringState, char> none_of(std::vector<char> chars) {
   return satisfy([=](char c) {
     auto iter = std::find(chars.begin(), chars.end(), c);
@@ -119,13 +126,19 @@ inline Parser<StringState, char> none_of(std::vector<char> chars) {
   });
 }
 
+// parse one space character.
 inline Parser<StringState, char> space =
-    satisfy([](char c) { return isspace(c); });
+    satisfy([](char c) { return isspace(c); }) ^ "space";
 
-inline Parser<StringState, std::monostate> spaces = skip_many(space);
+// TODO: Why do I need this <>?
+// because it's function template, you also have overload issue.
+inline Parser<StringState, std::monostate> spaces =
+    skip_many<>(space) ^ "white space";
 
 inline Parser<StringState, char> newline;
+
 inline Parser<StringState, char> crlf;
+
 inline Parser<StringState, char> endofline;
 inline Parser<StringState, char> tab;
 inline Parser<StringState, char> upper;
@@ -135,7 +148,6 @@ inline Parser<StringState, char> letter;
 inline Parser<StringState, char> digit;
 inline Parser<StringState, char> hex_digit;
 inline Parser<StringState, char> oct_digit;
-inline Parser<StringState, char> ch;
 inline Parser<StringState, char> any_char;
 inline Parser<StringState, std::string> string;
 } // namespace cppparsec
