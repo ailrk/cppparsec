@@ -445,6 +445,14 @@ Parser<S, T> operator*(Parser<S, T> p, Parser<S, T> q) {
 // define some core utilities.
 namespace cppparsec {
 
+// unexpected always fails with an unexpected error message.
+template <stream::state_type S, typename T>
+Parser<S, T> unexpected(std::string msg) {
+  return Parser([=](S state, Conts<S, T> cont) {
+    return cont.empty_err(unexpect_error(state.get_position(), msg));
+  });
+}
+
 // Rewind on failure.
 // Try parser p, if an error occurs it will rewind the stream back to the
 // previous state and pretent it didn't consume anything.

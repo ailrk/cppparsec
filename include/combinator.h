@@ -22,6 +22,27 @@ inline Parser<S, T> choice(std::vector<Parser<S, T>> options) {
   return result;
 }
 
+// convert a vector of parsers into a parser that return a vector.
+template <stream::state_type S, typename T>
+inline Parser<S, std::vector<T>> collect(std::vector<Parser<S, T>> ps) {
+  size_t size = ps.size();
+
+  std::function<Parser<S, std::vector<T>>(size_t, std::vector<T>)> collect_;
+
+  collect_ = [&](size_t idx, std::vector<T> acc) {
+    if (idx == size) {
+      return Parser<S, std::vector<T>>::pure(acc);
+    } else {
+      return ps[idx] >>= [&collect_, &acc, idx](T v) {
+        acc.push_back(v);
+        return collect_(idx + 1, acc);
+      };
+    }
+  };
+
+  return collect_(0, {});
+}
+
 template <stream::state_type S, typename T>
 inline Parser<S, std::vector<T>> count(uint32_t n, Parser<S, T> p) {
 
@@ -120,15 +141,27 @@ Parser<S, std::vector<T>> sep_by1(P p, Sep sep) {
   };
 }
 
-// parser `p` 0 or more times separated by sepend. it's allowed to end the
-// result with a SepEnd
 template <stream::state_type S, typename T, typename SepEnd>
-Parser<S, std::vector<T>> sepend_by(Parser<S, T> p, Parser<S, SepEnd> sepend) {}
+Parser<S, std::vector<T>> sepend_by(Parser<S, T> p, Parser<S, SepEnd> sepend);
 
 // parser `p` 0 or more times separated by sepend. it's allowed to end the
 // result with a SepEnd
 template <stream::state_type S, typename T, typename SepEnd>
-Parser<S, std::vector<T>> sepend_by1(Parser<S, T> p, Parser<S, SepEnd> sepend);
+Parser<S, std::vector<T>> sepend_by1(Parser<S, T> p, Parser<S, SepEnd> sepend) {
+  return (p >>= [=](T v) {
+    return sepend >>= [=](typename parser_trait<SepEnd>::type _1) {
+      return sepend_by(p, sepend) >>=
+             [=](std::vector<T> vs) { vs.insert(vs.begin(), 1, v); };
+    } | Parser<S, std::vector<T>>::pure(v);
+  });
+}
+
+// parser `p` 0 or more times separated by sepend. it's allowed to end the
+// result with a SepEnd
+template <stream::state_type S, typename T, typename SepEnd>
+Parser<S, std::vector<T>> sepend_by(Parser<S, T> p, Parser<S, SepEnd> sepend) {
+  return sepend_by1(p, sepend) | Parser<S, std::vector<T>>::pure({});
+}
 
 // parser `p` 0 or more times ended by end
 template <typename P, typename End,
@@ -160,7 +193,12 @@ Parser<S, T> chainr1(Parser<S, T> p, Parser<S, std::function<T(T, T)>> fn);
 template <stream::state_type S> Parser<S, std::monostate> eof;
 
 template <stream::state_type S, typename T>
-Parser<S, std::monostate> not_followed_by(Parser<S, T> p);
+Parser<S, std::monostate> not_followed_by(Parser<S, T> p) {
+  return attempt(attempt(p) >>= [=](T v) {
+    // default use to_string to print the value
+    return unexpected(std::to_string(v)) | Parser<S, std::monostate>::pure({});
+  });
+}
 
 template <stream::state_type S, typename T, typename End>
 Parser<S, std::vector<T>> many_till(Parser<S, T> p, Parser<S, End> end);
@@ -244,9 +282,20 @@ inline Parser<StringState, char> oct_digit =
 
 inline Parser<StringState, char> any_char = satisfy(const_(true));
 
-inline Parser<StringState, std::string> str =
-    many(any_char).map([](std::vector<char> charvec) {
-      return std::string(charvec.begin(), charvec.end());
-    });
+inline Parser<StringState, std::string> str(std::string s) {
+
+  if (s == "") {
+    return Parser<StringState, std::string>::pure("");
+  }
+
+  std::vector<Parser<StringState, char>> chparsers;
+  for (auto &c : s) {
+    chparsers.push_back(ch(c));
+  }
+
+  return collect(chparsers).map([](std::vector<char> charvec) {
+    return std::string(charvec.begin(), charvec.end());
+  });
+}
 
 } // namespace cppparsec
