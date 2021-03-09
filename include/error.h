@@ -9,21 +9,25 @@
 
 namespace cppparsec {
 
+enum class Error { SysUnExpect, UnExpect, Expect, Message };
+
+struct Message {
+  Error error_kind;
+  std::string text;
+
+  const std::string &to_string() const { return text; }
+
+  Message() : error_kind(Error::SysUnExpect), text() {}
+  Message(Error error_kind, std::string text)
+      : error_kind(error_kind), text(text) {}
+
+  friend bool operator==(const Message &m1, const Message &m2) {
+    return m1.error_kind == m2.error_kind && m1.text == m2.text;
+  }
+};
+
 class ParseError {
 public:
-  enum class Error { SysUnExpect, UnExpect, Expect, Message };
-  struct Message {
-    Error error_kind;
-    std::string text;
-
-    const std::string &to_string() const { return text; }
-
-    Message() : error_kind(Error::SysUnExpect), text() {}
-
-    Message(Error error_kind, std::string text)
-        : error_kind(error_kind), text(text) {}
-  };
-
 private:
   using Messages = std::vector<Message>;
 
@@ -60,28 +64,13 @@ public:
     }
   }
 
-  static Message message_error(const std::string &message) {
-    return Message(Error::Message, message);
-  }
-
-  static Message unexpect_error(const std::string &message) {
-    return Message(Error::UnExpect, message);
-  }
-
-  static Message expect_error(const std::string &message) {
-    return Message(Error::Expect, message);
-  }
-
-  static Message sys_unexpect_error(const std::string &message) {
-    return Message(Error::SysUnExpect, message);
-  }
-
   void set_position(Position pos) { position = pos; }
   Position get_position() const { return position; }
 
-  //
   void add_message(Message message) {
+    // messages.erase(std::remove(messages.begin(), messages.end(), message));
     messages.erase(std::remove(messages.begin(), messages.end(), message));
+
     messages.push_back(message);
   }
 
@@ -100,6 +89,26 @@ public:
     return ss.str();
   }
 };
+
+ParseError message_error(Position position, const std::string &message) {
+  auto m = Message(Error::Message, message);
+  return ParseError(position, {m});
+}
+
+ParseError unexpect_error(Position position, const std::string &message) {
+  auto m = Message(Error::UnExpect, message);
+  return ParseError(position, {m});
+}
+
+ParseError expect_error(Position position, const std::string &message) {
+  auto m = Message(Error::Expect, message);
+  return ParseError(position, {m});
+}
+
+ParseError sys_unexpect_error(Position position, const std::string &message) {
+  auto m = Message(Error::SysUnExpect, message);
+  return ParseError(position, {m});
+}
 
 template <stream::state_type S> ParseError unknown_error(S state) {
   return ParseError(state.get_position(), {});
