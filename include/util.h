@@ -8,6 +8,7 @@ template <typename... P> struct parameter_pack {
   template <template <typename...> typename T> using apply = T<P...>;
 };
 
+// function traits, it's useful to extract parts of a function type.
 template <typename T> struct function_traits_impl { using type = void; };
 template <typename Ret, typename Class, typename... Args>
 struct function_traits_impl<Ret (Class::*)(Args...) const> {

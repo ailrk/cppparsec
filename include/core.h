@@ -191,23 +191,25 @@ Reply<S, T> Parser<S, T>::operator()(const S &state) {
     return r.ok;
   };
 
-  unparser(state,
+  unparser(
 
-           {.consumed_ok = ok,
+      state,
 
-            .consumed_err = [&r, &state](ParseError err) -> bool {
-              r = Reply<S, T>::mk_consumed_err_reply(state, err);
-              return r.ok;
-            },
+      {.consumed_ok = ok,
 
-            .empty_ok = ok,
+       .consumed_err = [&r, &state](ParseError err) -> bool {
+         r = Reply<S, T>::mk_consumed_err_reply(state, err);
+         return r.ok;
+       },
 
-            .empty_err = [&r, &state](ParseError err) -> bool {
-              r = Reply<S, T>::mk_empty_err_reply(state, err);
-              return r.ok;
-            }
+       .empty_ok = ok,
 
-           });
+       .empty_err = [&r, &state](ParseError err) -> bool {
+         r = Reply<S, T>::mk_empty_err_reply(state, err);
+         return r.ok;
+       }
+
+      });
   return r;
 }
 
@@ -659,7 +661,6 @@ Parser<S, T> label(Parser<S, T> p, std::string msg) {
   return labels(p, {msg});
 }
 
-// behave like p, but replace the error message with `msg`.
 template <stream::state_type S, typename T>
 Parser<S, T> operator^(Parser<S, T> p, std::string msg) {
   return label(p, {msg});
