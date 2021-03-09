@@ -280,6 +280,7 @@ Parser<S, U> Parser<S, T>::map(const Fn &fn) {
 }
 
 // Monadic bind
+// m a -> (a -> m b) -> m b
 template <stream::state_type S, typename T>
 template <typename Fm, typename P, typename U>
 Parser<S, U> Parser<S, T>::bind(Fm fm) {

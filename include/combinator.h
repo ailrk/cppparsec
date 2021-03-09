@@ -24,34 +24,78 @@ inline Parser<S, T> choice(std::vector<Parser<S, T>> options) {
 
 template <stream::state_type S, typename T>
 inline Parser<S, std::vector<T>> count(uint32_t n, Parser<S, T> p) {
+
   if (n == 0) {
     return Parser<S, std::vector<T>>::pure({});
   } else {
+
+    std::function<Parser<S, std::vector<T>>(uint32_t, std::vector<T>)>
+        replicate;
+
+    replicate = [=](uint32_t n, std::vector<T> acc) {
+      if (n == 0) {
+        return Parser<S, std::vector<T>>::pure(acc);
+
+      } else {
+        p >>= [&replicate, n, acc{std::move(acc)}](T v) {
+          acc.push_back(v);
+          return replicate(n - 1, acc);
+        };
+      }
+    };
+
+    return replicate(n, {});
   }
 }
 
-template <stream::state_type S, typename T, typename Open, typename Close>
-inline Parser<S, T> between(Parser<S, Open> o, Parser<S, Close> c,
-                            Parser<S, T> p);
+template <typename P, typename Open, typename Close,
+          typename S = typename parser_trait<P>::stream,
+          typename T = typename parser_trait<P>::type>
+
+inline Parser<S, T> between(Open o, Close c, P p) {
+  using Ot_ = typename parser_trait<Open>::type;
+  using Ct_ = typename parser_trait<Close>::type;
+
+  return o >>= [=](Ot_ _1) {
+    return p >>= [=](T v) {
+      return c >>= [=](Ct_ _2) { return Parser<S, T>::pure(v); };
+    };
+  };
+}
 
 // parser `p`. If it's failed without consume anything, return t.
 template <stream::state_type S, typename T>
-inline Parser<S, T> option(T t, Parser<S, T> p);
+inline Parser<S, T> option(T t, Parser<S, T> p) {
+  return p | Parser<S, T>::pure(t);
+}
 
 // parser `p`, if it's failed without consume anything, return std::nullopt.
 template <stream::state_type S, typename T>
-inline Parser<S, std::optional<T>> option(Parser<S, T> p);
+inline Parser<S, std::optional<T>> option(Parser<S, T> p) {
+  return option(std::nullopt,
+                p.map([](T v) -> std::optional<T> { return {v}; }));
+}
 
 template <stream::state_type S, typename T, typename End>
-Parser<S, std::vector<T>> any_token(Parser<S, T> p);
+Parser<S, std::vector<T>> any_token(Parser<S, T> p) {}
 
 // skip at least 1 and return nothing.
 template <stream::state_type S, typename T>
-Parser<S, std::monostate> skip_many1(Parser<S, T> p);
+Parser<S, std::monostate> skip_many1(Parser<S, T> p) {
+  return p >>= [=](T _) { return skip_many(p); };
+}
 
 // parse `p` 1 or more times.
 template <stream::state_type S, typename T>
-Parser<S, std::vector<T>> many1(Parser<S, T> p);
+Parser<S, std::vector<T>> many1(Parser<S, T> p) {
+  return p >>= [=](T v) {
+    return many(p) >>= [=](std::vector<T> vs) {
+      vs.push_back(v);
+      std::reverse(vs.begin(), vs.end());
+      return Parser<S, std::vector<T>>::pure(vs);
+    };
+  };
+}
 
 // parse `p` 0 or more times  separated by sep.
 template <stream::state_type S, typename T, typename Sep>
@@ -145,7 +189,7 @@ inline Parser<StringState, char> space =
 // TODO: Why do I need this <>?
 // because it's function template, you also have overload issue.
 inline Parser<StringState, std::monostate> spaces =
-    skip_many<>(space) ^ "white space";
+    skip_many(space) ^ "white space";
 
 inline Parser<StringState, char> newline = ch('\n') ^ "lf new-line";
 
