@@ -45,6 +45,7 @@ using Test1 = Product<char, int>::type;
 
 // the implementation of sum types
 
+// let us use std::is_base_of to check if it's a sum type.
 template <typename T> struct SumTypesPrim {};
 
 template <typename... Ts> struct SumTypes : SumTypesPrim<Ts>... {
@@ -54,29 +55,34 @@ template <typename... Ts> struct SumTypes : SumTypesPrim<Ts>... {
 template <typename T, typename Sub> struct Sum;
 
 template <typename T, typename Sub> struct Sum {
-  using type_ = std::decay_t<T>;
-  using subtype_ = std::decay<Sub>;
+  using dtype_ = std::decay_t<T>;
+  using dsubtype_ = std::decay<Sub>;
 
   using type = std::conditional_t<
 
-      std::is_same_v<type_, subtype_>,
+      std::is_same_v<T, dsubtype_>,
 
-      type_,
+      dtype_,
 
-      SumTypes<type_, subtype_>>;
+      SumTypes<dtype_, dsubtype_>>;
 };
 
 template <typename... Ts, typename Sub> struct Sum<SumTypes<Ts...>, Sub> {
   using type_ = SumTypes<Ts...>;
-  using subtype_ = std::decay<Sub>;
+  using dsubtype_ = std::decay<Sub>;
 
   using type = std::conditional_t<
 
-      std::is_base_of_v<SumTypesPrim<subtype_>, type_>,
+      std::is_base_of_v<SumTypesPrim<dsubtype_>, type_>,
 
       type_,
 
-      SumTypes<Ts..., subtype_>>;
+      SumTypes<Ts..., dsubtype_>>;
 };
+
+#if defined(Debug)
+using Test2 = Sum<char, int>::type;
+#endif
+using Test3 = Sum<Product<char, int>, double>::type;
 
 } // namespace cppparsec::typechecker

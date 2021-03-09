@@ -1,6 +1,13 @@
+// TODO convert all pass by value to better alternative.
+// Plan:
+// 1. turn unparser to shared_ptr
+// 2. capture unpaser by value
+// 3. capture others by const ref
+// 4. handle reply and it's life time nicely. ()
 #pragma once
 #include "error.h"
 #include "stream.h"
+#include "typecheck.h"
 #include "util.h"
 #include <cassert>
 #include <concepts>
@@ -16,8 +23,9 @@ namespace cppparsec {
 
 using namespace cppparsec::util;
 
-// The return type of a parser. It contains the grammar state (stream) and
-// parsed result. consumed and ok are used to indicate the state of the parser.
+// The return type of a parser. It contains the current state (stream) and
+// parsed result.
+// `consumed` and `ok` are used to indicate the state of the parser.
 template <stream::state_type S, typename T> class Reply {
 
   // NOTE: This will be the value get passed to the next continuation in ok
@@ -38,6 +46,7 @@ public:
         ParseError error)
       : consumed(consumed), ok(ok), value(value), state(state), error(error) {
 
+    // check invalid reply state.
     assert(ok ? value.has_value() : !value.has_value());
   }
 
@@ -53,6 +62,8 @@ public:
   }
 
   // make some smart constructors to avoid invalid state.
+  // If we only only create Reply with these functions we will never have
+  // invalid Reply. e.g a empty reply with non std::nullopt value.
 
   // the stream is consumed and no error occurs.
   static Reply<S, T> mk_consumed_ok_reply(T value, S state, ParseError error) {
@@ -101,6 +112,12 @@ using ParserFn = std::function<bool(S, Conts<S, T>)>;
 
 template <stream::state_type S, typename T> class Parser;
 
+// linker quirks for friend functions.
+template <stream::state_type S, typename T>
+Parser<S, T> operator|(Parser<S, T>, Parser<S, T>);
+template <stream::state_type S, typename T>
+Parser<S, T> operator*(Parser<S, T>, Parser<S, T>);
+
 template <typename> struct parser_trait {};
 
 template <typename S, typename T> struct parser_trait<Parser<S, T>> {
@@ -114,6 +131,18 @@ static Parser<S, T> make_parser(std::function<Reply<S, T>(S)> transition);
 
 template <stream::state_type S, typename T> class Parser {
 
+  // TODO 2021-03-09:
+  // Convert unparser to a shared_ptr.
+  // The entire Parser class is just a wrapper over unparser, so it should be
+  // fairly small. Once we change it to shared_ptr, copying a parser of takes
+  // 16 bytes, which can is neglible.
+  //
+  // Using shared_ptr here so we can ensure the life time of unparser last
+  // longer than the wrapper type. This allows us to write something like
+  //    auto q = p.map(f1).map(f2);
+  //    q();
+  // If we capture unparser by reference, the intermediate parser created in the
+  // middle of the chain will destruct at the end of the statement.
 public:
   using reply = Reply<S, T>;
   using type = T;
@@ -155,8 +184,10 @@ public:
   static Parser<S, T> create(std::function<Reply<S, T>(S)> transition) {
     return Parser([transition](S state, Conts<S, T> cont) {
       Reply<S, T> r = transition(state);
+
       assert((r.ok && r.value != std::nullopt) ||
              (!r.ok && r.value == std::nullopt));
+
       if (r.consumed) {
         r.ok ? cont.consumed_ok(r) : cont.consumed_err(r.error);
       } else {
@@ -166,8 +197,8 @@ public:
     });
   }
 
-  friend Parser<S, T> operator|(Parser<S, T>, Parser<S, T>);
-  friend Parser<S, T> operator*(Parser<S, T>, Parser<S, T>);
+  friend Parser<S, T> operator|<>(Parser<S, T>, Parser<S, T>);
+  friend Parser<S, T> operator*<>(Parser<S, T>, Parser<S, T>);
 
   template <typename Fm, typename P = typename function_traits<Fm>::return_type,
             typename U = typename parser_trait<P>::type>
@@ -185,6 +216,12 @@ public:
 template <stream::state_type S, typename T>
 Reply<S, T> Parser<S, T>::operator()(const S &state) {
   Reply<S, T> r;
+
+  // the entrance callback.
+  // one thing to notice about cps is that new continuation needs to refer to
+  // environment from the caller, and all of these environments needs to be
+  // kepts on the heap. If we have a very deep recursion it can use up
+  // memory.
 
   auto ok = [&r](auto rep) -> bool {
     r = rep;
@@ -253,6 +290,7 @@ Parser<S, U> Parser<S, T>::bind(Fm fm) {
     auto consumer_ok = [=](Reply<S, T> reply) -> bool {
       assert(reply.value.has_value());
 
+      // for consumed case just go through.
       auto consumed_ok = cont.consumed_ok;
       auto consumed_err = cont.consumed_err;
 
@@ -483,12 +521,8 @@ Parser<S, std::vector<T>> many_accum(AccumFn fn, Parser<S, T> p) {
 
            .consumed_err = cont.consumed_err,
 
-           // this case should not happen.
-           // you should not allow a parser accepts empty string to be ran
-           // multiple times.
-           //
-           // TODO gracefully handle this case.
-
+           // this case should never happen.
+           // You can't have a parser accepts empty string keeps running.
            .empty_ok =
                [](Reply<S, T> reply) {
                  throw bad_many_combinator();
@@ -535,7 +569,8 @@ Parser<S, std::vector<T>> many_accum(AccumFn fn, Parser<S, T> p) {
 // parse `p` zero or more times.
 template <typename P, typename S = typename parser_trait<P>::stream,
           typename T = typename parser_trait<P>::type>
-Parser<S, std::vector<T>> many(Parser<S, T> p) {
+
+Parser<S, std::vector<T>> many(P p) {
   return many_accum(
       [](T v, std::vector<T> acc) {
         acc.push_back(v);
@@ -550,6 +585,7 @@ template <typename P,
 
           typename S = typename parser_trait<P>::stream,
           typename T = typename parser_trait<P>::type>
+
 Parser<S, std::monostate> skip_many(P p) {
   return many_accum([](T v, std::vector<T> acc) { return std::vector<T>{}; },
                     p) >>
@@ -614,8 +650,10 @@ static void add_expected_message(ParseError &error,
   if (!error.is_unkown_error()) {
     if (msgs.size() == 0) {
       error.add_message({Error::Expect, ""});
+
     } else if (msgs.size() == 1) {
       error.add_message({Error::Expect, msgs[0]});
+
     } else {
       for (auto &msg : msgs) {
         error.add_message({Error::Expect, msg});
@@ -628,8 +666,8 @@ static void add_expected_message(ParseError &error,
 template <stream::state_type S, typename T>
 Parser<S, T> labels(Parser<S, T> p, const std::vector<std::string> &msgs) {
 
-  return Parser([=](S state, Conts<S, T> cont) {
-    auto empty_ok1 = [=](Reply<S, T> reply) -> bool {
+  return Parser<S, T>([=](S state, Conts<S, T> cont) {
+    auto empty_ok = [=](Reply<S, T> reply) -> bool {
       Reply<S, T> rep1(reply);
       ParseError &error = rep1.error;
 
@@ -637,7 +675,7 @@ Parser<S, T> labels(Parser<S, T> p, const std::vector<std::string> &msgs) {
       return cont.empty_ok(rep1);
     };
 
-    auto empty_err1 = [=](ParseError error) -> bool {
+    auto empty_err = [=](ParseError error) -> bool {
       add_expected_message(error, msgs);
       return cont.empty_err(error);
     };
@@ -648,8 +686,8 @@ Parser<S, T> labels(Parser<S, T> p, const std::vector<std::string> &msgs) {
 
         {.consumed_ok = cont.consumed_ok,
          .consumed_err = cont.consumed_err,
-         .empty_ok = cont.empty_ok1,
-         .empty_err = empty_err1
+         .empty_ok = empty_ok,
+         .empty_err = empty_err
 
         });
   });
@@ -661,6 +699,7 @@ Parser<S, T> label(Parser<S, T> p, std::string msg) {
   return labels(p, {msg});
 }
 
+// behave like p, but replace the error message with `msg`.
 template <stream::state_type S, typename T>
 Parser<S, T> operator^(Parser<S, T> p, std::string msg) {
   return label(p, {msg});

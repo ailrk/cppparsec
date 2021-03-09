@@ -14,10 +14,21 @@
 namespace cppparsec {
 
 template <stream::state_type S, typename T>
-inline Parser<S, T> choice(std::vector<Parser<S, T>> options);
+inline Parser<S, T> choice(std::vector<Parser<S, T>> options) {
+  Parser<S, T> result = zerop<S, T>;
+  for (auto &o : options) {
+    result = result | o;
+  }
+  return result;
+}
 
 template <stream::state_type S, typename T>
-inline Parser<S, std::vector<T>> count(uint32_t n, std::vector<T> options);
+inline Parser<S, std::vector<T>> count(uint32_t n, Parser<S, T> p) {
+  if (n == 0) {
+    return Parser<S, std::vector<T>>::pure({});
+  } else {
+  }
+}
 
 template <stream::state_type S, typename T, typename Open, typename Close>
 inline Parser<S, T> between(Parser<S, Open> o, Parser<S, Close> c,
@@ -94,6 +105,7 @@ Parser<S, std::vector<T>> many_till(Parser<S, T> p, Parser<S, End> end);
 
 } // namespace cppparsec
 
+// Useful combinators works on characters.
 namespace cppparsec {
 
 using namespace stream;
@@ -135,19 +147,43 @@ inline Parser<StringState, char> space =
 inline Parser<StringState, std::monostate> spaces =
     skip_many<>(space) ^ "white space";
 
-inline Parser<StringState, char> newline;
+inline Parser<StringState, char> newline = ch('\n') ^ "lf new-line";
 
-inline Parser<StringState, char> crlf;
+inline Parser<StringState, char> crlf =
+    (ch('\r') >> ch('\n')) ^ "crlf new-line";
+inline Parser<StringState, char> endofline = (newline | crlf) ^ "new-line";
 
-inline Parser<StringState, char> endofline;
-inline Parser<StringState, char> tab;
-inline Parser<StringState, char> upper;
-inline Parser<StringState, char> lower;
-inline Parser<StringState, char> alpha_num;
-inline Parser<StringState, char> letter;
-inline Parser<StringState, char> digit;
-inline Parser<StringState, char> hex_digit;
-inline Parser<StringState, char> oct_digit;
-inline Parser<StringState, char> any_char;
-inline Parser<StringState, std::string> string;
+inline Parser<StringState, char> tab = ch('\t') ^ "tab";
+
+inline Parser<StringState, char> upper =
+    satisfy([](char c) { return std::isupper(c); }) ^ "uppercase letter";
+
+inline Parser<StringState, char> lower =
+    satisfy([](char c) { return std::islower(c); }) ^ "lowercase letter";
+
+inline Parser<StringState, char> alpha_num =
+    satisfy([](char c) { return std::isalnum(c); }) ^ "alpha numeral letter";
+
+inline Parser<StringState, char> alpha =
+    satisfy([](char c) { return std::isalpha(c); }) ^ "alpha letter";
+
+inline Parser<StringState, char> letter = alpha;
+
+inline Parser<StringState, char> digit =
+    satisfy([](char c) { return std::isdigit(c); }) ^ "digit letter";
+
+inline Parser<StringState, char> hex_digit =
+    (one_of({'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F'}) |
+     digit) ^
+    "hex digit letter";
+
+inline Parser<StringState, char> oct_digit =
+    (one_of({'1', '2', '3', '4', '5', '6', '7', '0'})) ^ "hex digit letter";
+
+inline Parser<StringState, char> any_char = satisfy(const_(true));
+
+inline Parser<StringState, std::string> str =
+    many(any_char).map([](std::vector<char> charvec) {
+      return std::string(charvec.begin(), charvec.end());
+    });
 } // namespace cppparsec
