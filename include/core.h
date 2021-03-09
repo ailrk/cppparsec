@@ -55,25 +55,29 @@ public:
   // make some smart constructors to avoid invalid state.
 
   // the stream is consumed and no error occurs.
-  static Reply<S, T> mk_cok_reply(T value, S state, ParseError error) {
+  static Reply<S, T> mk_consumed_ok_reply(T value, S state, ParseError error) {
     return {true, true, {value}, state, error};
   }
 
   // the stream is consumed and an error occurs;
-  static Reply<S, T> mk_cerr_reply(S state, ParseError error) {
+  static Reply<S, T> mk_consumed_err_reply(S state, ParseError error) {
     return {true, false, {}, state, error};
   }
 
   // the stream is not consumed and no error occurs.
-  static Reply<S, T> mk_eok_reply(T value, S state, ParseError error) {
+  static Reply<S, T> mk_empty_ok_reply(T value, S state, ParseError error) {
     return {false, true, {value}, state, error};
   }
 
   // the stream is not consumed and error occurs.
-  static Reply<S, T> mk_eerr_reply(S state, ParseError error) {
+  static Reply<S, T> mk_empty_err_reply(S state, ParseError error) {
     return {false, false, {}, state, error};
   }
 };
+
+/*
+ * Define some useful types alias here.
+ * */
 
 template <stream::state_type S, typename T>
 using OkContinuation = std::function<bool(const Reply<S, T> &)>;
@@ -85,11 +89,11 @@ using ErrContinuation = std::function<bool(ParseError)>;
 // The struct is to make passing continuation easier.
 template <stream::state_type S, typename T> struct Conts {
 
-  OkContinuation<S, T> cok;
-  ErrContinuation cerr;
+  OkContinuation<S, T> consumed_ok;
+  ErrContinuation consumed_err;
 
-  OkContinuation<S, T> eok;
-  ErrContinuation eerr;
+  OkContinuation<S, T> empty_ok;
+  ErrContinuation empty_err;
 };
 
 template <stream::state_type S, typename T>
@@ -128,8 +132,9 @@ public:
 
   static Parser<S, T> pure(T a) {
     return Parser([=](S state, Conts<S, T> cont) {
-      Reply<S, T> r = Reply<S, T>::mk_eok_reply(a, state, unknown_error(state));
-      return cont.eok(r);
+      Reply<S, T> r =
+          Reply<S, T>::mk_empty_ok_reply(a, state, unknown_error(state));
+      return cont.empty_ok(r);
     });
   }
 
@@ -153,9 +158,9 @@ public:
       assert((r.ok && r.value != std::nullopt) ||
              (!r.ok && r.value == std::nullopt));
       if (r.consumed) {
-        r.ok ? cont.cok(r) : cont.cerr(r.error);
+        r.ok ? cont.consumed_ok(r) : cont.consumed_err(r.error);
       } else {
-        r.ok ? cont.eok(r) : cont.eerr(r.error);
+        r.ok ? cont.empty_ok(r) : cont.empty_err(r.error);
       }
       return r.ok;
     });
@@ -181,35 +186,32 @@ template <stream::state_type S, typename T>
 Reply<S, T> Parser<S, T>::operator()(const S &state) {
   Reply<S, T> r;
 
-  auto ok = [&r](auto rep) {
+  auto ok = [&r](auto rep) -> bool {
     r = rep;
     return r.ok;
   };
 
   unparser(state,
 
-           {
+           {.consumed_ok = ok,
 
-               .cok = ok,
+            .consumed_err = [&r, &state](ParseError err) -> bool {
+              r = Reply<S, T>::mk_consumed_err_reply(state, err);
+              return r.ok;
+            },
 
-               .cerr =
-                   [&r, &state](ParseError err) {
-                     r = Reply<S, T>::mk_cerr_reply(state, err);
-                     return r.ok;
-                   },
+            .empty_ok = ok,
 
-               .eok = ok,
-
-               .eerr =
-                   [&r, &state](ParseError err) {
-                     r = Reply<S, T>::mk_eerr_reply(state, err);
-                     return r.ok;
-                   }
+            .empty_err = [&r, &state](ParseError err) -> bool {
+              r = Reply<S, T>::mk_empty_err_reply(state, err);
+              return r.ok;
+            }
 
            });
   return r;
 }
 
+// map function T -> U into the Parser<S, T>, return a new Parser<S, U>
 template <stream::state_type S, typename T>
 template <typename Fn, typename U>
 Parser<S, U> Parser<S, T>::map(const Fn &fn) {
@@ -217,25 +219,24 @@ Parser<S, U> Parser<S, T>::map(const Fn &fn) {
                 "Function to map has the wrong type");
 
   return Parser<S, U>(
+
       [fn, p = unparser](const S &state, const Conts<S, U> &cont) {
-        auto mapped_ok = [&cont, &fn](Reply<S, T> reply) {
-          return cont.cok(reply.map(fn));
+        // map on continuation.
+        auto mapped_ok = [&cont, &fn](Reply<S, T> reply) -> bool {
+          return cont.consumed_ok(reply.map(fn));
         };
 
-        return p(state,
+        return p(
 
-                 // only need to map continuations that carry values.
-                 {
+            state,
 
-                     .cok = mapped_ok,
+            // only need to map continuations that carry values.
+            {.consumed_ok = mapped_ok,
+             .consumed_err = cont.consumed_err,
+             .empty_ok = mapped_ok,
+             .empty_err = cont.empty_err
 
-                     .cerr = cont.cerr,
-
-                     .eok = mapped_ok,
-
-                     .eerr = cont.eerr
-
-                 });
+            });
       });
 }
 
@@ -247,87 +248,72 @@ Parser<S, U> Parser<S, T>::bind(Fm fm) {
                 "Monadic function for bind has the wrong type");
 
   return Parser<S, U>([=, p = unparser](S state, Conts<S, U> cont) {
+    auto consumer_ok = [=](Reply<S, T> reply) -> bool {
+      assert(reply.value.has_value());
+
+      auto consumed_ok = cont.consumed_ok;
+      auto consumed_err = cont.consumed_err;
+
+      // go with the consumed continuation when m.unparser doesn't
+      // consume but ok.
+      auto pempty_ok = [=](Reply<S, U> rep1) -> bool {
+        rep1.error = reply.error + rep1.error;
+        return cont.consumed_ok(rep1);
+      };
+
+      auto pempty_err = [=](ParseError e) -> bool {
+        ParseError error = reply.error + e;
+        return cont.consumed_err(error);
+      };
+
+      Parser<S, U> m = fm(reply.value.value());
+      return m.unparser(
+
+          state,
+
+          {.consumed_ok = consumed_ok,
+           .consumed_err = consumed_err,
+           .empty_ok = pempty_ok,
+           .empty_err = pempty_err
+
+          });
+    };
+
+    auto empty_ok = [=](Reply<S, T> reply) {
+      assert(reply.value.has_value());
+
+      auto consumed_ok = cont.consumed_ok;
+      auto consumed_err = cont.consumed_err;
+
+      auto pempty_ok = [=](Reply<S, U> rep1) -> bool {
+        rep1.error = reply.error + rep1.error;
+        return cont.empty_ok(rep1);
+      };
+
+      auto pempty_err = [=](ParseError e) -> bool {
+        ParseError error = reply.error + e;
+        return cont.empty_err(e);
+      };
+
+      Parser<S, U> m = fm(reply.value.value());
+      return m.unparser(
+
+          state,
+
+          {.consumed_ok = consumed_ok,
+           .consumed_err = consumed_err,
+           .empty_ok = pempty_ok,
+           .empty_err = pempty_err
+
+          });
+    };
+
     return p(state,
 
-             {
-
-                 // consumed and ok
-                 [=](Reply<S, T> reply) {
-                   assert(reply.value.has_value());
-
-                   auto cok = cont.cok;
-                   auto cerr = cont.cerr;
-
-                   // go with the consumed continuation when m.unparser doesn't
-                   // consume but ok.
-                   auto peok = [=](Reply<S, U> rep1) {
-                     rep1.error = reply.error + rep1.error;
-                     return cont.cok(rep1);
-                   };
-
-                   auto peerr = [=](ParseError e) {
-                     ParseError error = reply.error + e;
-                     return cont.cerr(error);
-                   };
-
-                   Parser<S, U> m = fm(reply.value.value());
-                   return m.unparser(
-
-                       state,
-
-                       {
-
-                           .cok = cok,
-
-                           .cerr = cerr,
-
-                           .eok = peok,
-
-                           .eerr = peerr
-
-                       });
-                 },
-
-                 cont.cerr,
-
-                 // not consumed and ok.
-                 [=](Reply<S, T> reply) {
-                   assert(reply.value.has_value());
-
-                   auto cok = cont.cok;
-                   auto cerr = cont.cerr;
-
-                   auto peok = [=](Reply<S, U> rep1) {
-                     rep1.error = reply.error + rep1.error;
-                     return cont.eok(rep1);
-                   };
-
-                   auto peerr = [=](ParseError e) {
-                     ParseError error = reply.error + e;
-                     return cont.eerr(e);
-                   };
-
-                   Parser<S, U> m = fm(reply.value.value());
-                   return m.unparser(
-
-                       state,
-
-                       {
-
-                           .cok = cok,
-
-                           .cerr = cerr,
-
-                           .eok = peok,
-
-                           .eerr = peerr
-
-                       });
-                 },
-
-                 cont.eerr
-
-             });
+             {.consumed_ok = consumer_ok,
+              .consumed_err = cont.consumed_err,
+              .empty_ok = empty_ok,
+              .empty_err = cont.empty_err});
   });
 }
 
@@ -347,61 +333,56 @@ Parser<S, U> Parser<S, T>::apply(M m) {
 // Identity for operator|. zerop will always fail and never consume input.
 template <stream::state_type S, typename T>
 Parser<S, T> zerop([](S state, Conts<S, T> cont) {
-  return cont.eerr(unknown_error(state));
+  return cont.empty_err(unknown_error(state));
 });
 
 // Identity for operator* open will not accept no input. This is purely for the
 // algebraic property...
 template <stream::state_type S, typename T>
 Parser<S, T> onep([](S state, Conts<S, T> cont) {
-  return cont.eerr(unknown_error(state));
+  return cont.empty_err(unknown_error(state));
 });
 
 // Parse `m` first, if succeed, go though with the result. If failed try to
-// parse n with the current stream state. Note if `m` is failed and consumed
+// parse `n` with the current stream state. Note if `m` is failed and consumed
 // input, the input will not be rewind when parsing `n`.
 template <stream::state_type S, typename T>
 Parser<S, T> Parser<S, T>::alt(Parser<S, T> n) {
 
   return Parser([=, m = unparser](S state, Conts<S, T> cont) {
-    auto meerr = [=](ParseError error) { // when m fails, parse n.
-      auto neok = [=](Reply<S, T> reply) {
+    // when m fails without consuming anything, parse n.
+    auto mempty_err = [=](ParseError error) -> bool {
+      auto nempty_ok = [=](Reply<S, T> reply) {
         reply.error = reply.error + error;
-        return cont.eok(reply);
+        return cont.empty_ok(reply);
       };
 
-      auto neerr = [=](ParseError error1) { return cont.eerr(error + error1); };
+      // if nempty is also failed, return an error.
+      // this case is actually the identify of `alt` operator.
+      auto nempty_err = [=](ParseError error1) -> bool {
+        return cont.empty_err(error + error1);
+      };
 
       return n.unparser(
 
           state,
 
-          {
-
-              .cok = cont.cok,
-
-              .cerr = cont.cerr,
-
-              .eok = neok,
-
-              .eerr = neerr
+          {.consumed_ok = cont.consumed_ok,
+           .consumed_err = cont.consumed_err,
+           .empty_ok = nempty_ok,
+           .empty_err = nempty_err
 
           });
     };
 
-    return p(
+    return m(
 
         state,
 
-        {
-
-            .cok = cont.cok,
-
-            .cerr = cont.cerr,
-
-            .eok = cont.eok,
-
-            .eerr = meerr
+        {.consumed_ok = cont.consumed_ok,
+         .consumed_err = cont.consumed_err,
+         .empty_ok = cont.empty_ok,
+         .empty_err = mempty_err
 
         });
   });
@@ -432,20 +413,16 @@ namespace cppparsec {
 // previous state and pretent it didn't consume anything.
 template <stream::state_type S, typename T>
 Parser<S, T> attempt(Parser<S, T> p) {
-  return Parser([=](S state, Conts<S, T> cont) {
+
+  return Parser([p](S state, Conts<S, T> cont) {
     return p.unparser(
 
         state,
 
-        {
-
-            .cok = cont.cok,
-
-            .cerr = cont.eerr,
-
-            .eok = cont.eok,
-
-            .eerr = cont.eerr
+        {.consumed_ok = cont.consumed_ok,
+         .consumed_err = cont.empty_err,
+         .empty_ok = cont.empty_ok,
+         .empty_err = cont.empty_err
 
         });
   });
@@ -456,25 +433,22 @@ Parser<S, T> attempt(Parser<S, T> p) {
 // input, so does (lookAhead p).
 template <stream::state_type S, typename T>
 Parser<S, T> look_ahead(Parser<S, T> p) {
-  return Parser([=](S state, Conts<S, T> cont) {
-    auto eok1 = [=](Reply<S, T> reply) {
+
+  return Parser([p](S state, Conts<S, T> cont) {
+    auto empty_ok1 = [=](Reply<S, T> reply) -> bool {
       Reply<S, T> rep1{reply};
       rep1.error = unknown_error(state);
-      return cont.eok(rep1);
+      return cont.empty_ok(rep1);
     };
+
     return p.unparser(
 
         state,
 
-        {
-
-            .cok = eok1,
-
-            .cerr = cont.cerr,
-
-            .eok = eok1,
-
-            .eerr = cont.eerr
+        {.consumed_ok = empty_ok1,
+         .consumed_err = cont.consumed_err,
+         .empty_ok = empty_ok1,
+         .empty_err = cont.empty_err
 
         });
   });
@@ -492,57 +466,56 @@ Parser<S, std::vector<T>> many_accum(AccumFn fn, Parser<S, T> p) {
                                             Reply<S, T> reply)>
         walk;
 
+    // TODO: Now all vector are copied. handle this later.
     // recursively accumulate result from p
     walk = [=](std::vector<T> acc, Reply<S, T> reply) {
-      auto cok = [=](Reply<S, T> reply) {
-        auto v = reply.value.value();
-        walk(fn(v, acc), reply);
-        return reply.ok;
-      };
-
-      auto eerr = [=](ParseError error) {
-        Reply<S, std::vector<T>> rep1 = Reply<S, std::vector<T>>::mk_cok_reply(
-            acc, reply.state, reply.error);
-        return cont.cok(rep1);
-      };
-
       return p.unparser(
 
           reply.state,
 
-          {
+          {.consumed_ok = [=](Reply<S, T> reply) -> bool {
+             auto v = reply.value.value();
+             acc = fn(v, acc);
+             walk(acc, reply);
+             return reply.ok;
+           },
 
-              .cok = cok,
+           .consumed_err = cont.consumed_err,
 
-              .cerr = cont.cerr,
+           // this case should not happen.
+           // you should not allow a parser accepts empty string to be ran
+           // multiple times.
+           //
+           // We just pipe it to empty_err and return a empty
+           // vector.
+           .empty_ok = cont.empty_err,
 
-              .eok = cont.eok,
+           .empty_err = [=](ParseError error) -> bool {
+             Reply<S, std::vector<T>> rep1;
+             rep1 = Reply<S, std::vector<T>>::mk_consumed_ok_reply(
+                 acc, reply.state, reply.error);
 
-              .eerr = eerr
+             return cont.consumed_ok(rep1);
+           }
 
           });
-    };
-
-    auto walk_start = [=](Reply<S, T> reply) { return walk(); };
-    auto eerr = [=](ParseError error) {
-      Reply<S, std::vector<T>> reply = Reply<S, std::vector<T>>::mk_eok_reply();
-      // TODO
-      return cont.eok();
     };
 
     return p.unparser(
 
         state,
 
-        {
+        {.consumed_ok = [=](Reply<S, T> reply) -> bool {
+           return walk({}, reply);
+         },
 
-            .cok = walk_start,
+         .consumed_err = cont.consumed_err,
+         .empty_ok = cont.empty_ok,
 
-            .cerr = cont.cerr,
-
-            .eok = cont.eok,
-
-            .eerr = eerr
+         .empty_err = [=](ParseError error) -> bool {
+           auto reply = Reply<S, std::vector<T>>::mk_empty_ok_reply();
+           return cont.empty_ok(reply);
+         }
 
         });
   });
@@ -550,31 +523,23 @@ Parser<S, std::vector<T>> many_accum(AccumFn fn, Parser<S, T> p) {
 
 // parse `p` zero or more times.
 template <stream::state_type S, typename T>
-Parser<S, std::vector<T>> many(Parser<S, T> p) {
+Parser<S, std::vector<T>> many = [](Parser<S, T> p) {
+  return many_accum(
+      [](T v, std::vector<T> acc) {
+        acc.push_back(v);
+        return acc;
+      },
+      p);
+};
 
-  return Parser([=](S state, Conts<S, std::vector<T>> cont) {
-    std::vector<T> result;
-
-    // TODO how to repeatively parse p until fair without using
-    // continuation or straight recurison?
-    // how to parsing a same operation many times?
-
-    auto cok = [=](Reply<S, T> reply) {
-      auto v = reply.value.value();
-      cont.cok();
-    };
-
-    auto eok = [=](Reply<S, T> reply) { auto v = reply.value.value(); };
-
-    return p.unparser(state, {cok, cont.cerr, eok, cont.eerr});
-  });
-}
-
+// TODO: now just make a new empty vector. try to reuse empty acc instead.
 // skip many and return nothing.
 template <stream::state_type S, typename T>
-Parser<S, std::monostate> skip_many(Parser<S, T> p) {
-  // TODO
-}
+Parser<S, std::monostate> skip_many = [](Parser<S, T> p) {
+  return many_accum([](T v, std::vector<T> acc) { return std::vector<T>{}; },
+                    p) >>
+         Parser<S, std::monostate>::pure({});
+};
 
 // primitive term parser.
 // Takes a customized pretty printer, because we might want to use different
@@ -597,28 +562,29 @@ Parser<S, T> token(PrettyPrint pretty_print, Match match) {
 
   return Parser<S, T>([=](S state, Conts<S, T> cont) {
     std::optional<std::tuple<V, D>> r = state.uncons(); // fetch from stream.
-
     if (!r.has_value()) {
       auto error = unexpect_error(state.get_position(), "The stream is empty");
-      return cont.eerr(error);
+      return cont.empty_err(error);
     }
 
     auto [v, stream] = r.value(); // peek
     if (match(v)) {
 
+      // valid token, construct a new reply with the token as it's value.
       Position newpos = state.next_position();
       state.eat(newpos);
 
       Reply<S, T> reply =
-          Reply<S, T>::mk_cok_reply({v}, state, unknown_error(state));
+          Reply<S, T>::mk_consumed_ok_reply({v}, state, unknown_error(state));
 
       reply.value = {v};
       reply.state = state;
       reply.error = reply.error + unknown_error(state);
-      return cont.cok(reply);
+      return cont.consumed_ok(reply);
 
     } else {
-      return cont.eerr(unexpect_error(state.get_position(), pretty_print(v)));
+      auto error = unexpect_error(state.get_position(), pretty_print(v));
+      return cont.empty_err(error);
     }
   });
 }
@@ -646,33 +612,29 @@ static void add_expected_message(ParseError &error,
 // replce error message with msgs
 template <stream::state_type S, typename T>
 Parser<S, T> labels(Parser<S, T> p, const std::vector<std::string> &msgs) {
+
   return Parser([=](S state, Conts<S, T> cont) {
-    auto eok1 = [=](Reply<S, T> reply) {
+    auto empty_ok1 = [=](Reply<S, T> reply) -> bool {
       Reply<S, T> rep1(reply);
       ParseError &error = rep1.error;
 
       add_expected_message(error, msgs);
-      return cont.eok(rep1);
+      return cont.empty_ok(rep1);
     };
 
-    auto eerr1 = [=](ParseError error) {
+    auto empty_err1 = [=](ParseError error) -> bool {
       add_expected_message(error, msgs);
-      return cont.eerr(error);
+      return cont.empty_err(error);
     };
 
     return p.unparser(
 
         state,
 
-        {
-
-            .cok = cont.cok,
-
-            .cerr = cont.cerr,
-
-            .eok = cont.eok1,
-
-            .eerr = eerr1
+        {.consumed_ok = cont.consumed_ok,
+         .consumed_err = cont.consumed_err,
+         .empty_ok = cont.empty_ok1,
+         .empty_err = empty_err1
 
         });
   });
@@ -685,6 +647,3 @@ Parser<S, T> label(Parser<S, T> p, std::string msg) {
 }
 
 } // namespace cppparsec
-
-// some debuggin utilities
-namespace cppparsec::debug {} // namespace cppparsec::debug

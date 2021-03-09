@@ -87,7 +87,7 @@ TEST_CASE("parser basis") {
 
   SECTION("creation1") {
     auto p = PChar::create([](StringState s) {
-      return PChar::reply::mk_cok_reply('c', s, unknown_error(s));
+      return PChar::reply::mk_consumed_ok_reply('c', s, unknown_error(s));
     });
     auto r = p(s);
 
@@ -96,7 +96,7 @@ TEST_CASE("parser basis") {
 
   SECTION("creation2") {
     auto p = PChar::create([](StringState s) {
-      return PChar::reply::mk_cerr_reply(s, unknown_error(s));
+      return PChar::reply::mk_consumed_err_reply(s, unknown_error(s));
     });
     auto r = p(s);
     REQUIRE(!r.value.has_value());
@@ -104,7 +104,7 @@ TEST_CASE("parser basis") {
 
   SECTION("creation3") {
     auto p = PChar::create([](StringState s) {
-      return PChar::reply::mk_eok_reply('c', s, unknown_error(s));
+      return PChar::reply::mk_empty_ok_reply('c', s, unknown_error(s));
     });
     auto r = p(s);
     REQUIRE(r.value.value() == 'c');
@@ -112,7 +112,7 @@ TEST_CASE("parser basis") {
 
   SECTION("creation4") {
     auto p = PChar::create([](StringState s) {
-      return PChar::reply::mk_eerr_reply(s, unknown_error(s));
+      return PChar::reply::mk_empty_err_reply(s, unknown_error(s));
     });
     auto r = p(s);
     REQUIRE(!r.value.has_value());
@@ -126,7 +126,7 @@ TEST_CASE("parser map") {
   using PInt = Parser<StringState, int>;
   StringState s("abc\ndef\nghi\n");
   auto p = PChar::create([](StringState s) {
-    return PChar::reply::mk_cok_reply('c', s, unknown_error(s));
+    return PChar::reply::mk_consumed_ok_reply('c', s, unknown_error(s));
   });
 
   auto fn = [](char v) -> int { return 1; };
@@ -156,24 +156,24 @@ TEST_CASE("bind") {
   using PStr = Parser<StringState, std::string>;
   StringState s("abc\ndef\nghi\n");
   auto p = PChar::create([](StringState s) {
-    return PChar::reply::mk_cok_reply('c', s, unknown_error(s));
+    return PChar::reply::mk_consumed_ok_reply('c', s, unknown_error(s));
   });
 
   auto fn = [](int a) { // int -> m char
     return PChar::create([](StringState s) {
-      return PChar::reply::mk_cok_reply('c', s, unknown_error(s));
+      return PChar::reply::mk_consumed_ok_reply('c', s, unknown_error(s));
     });
   };
 
   auto fn1 = [](char a) { // char -> m int
     return PInt::create([](StringState s) {
-      return PInt::reply::mk_cok_reply(1, s, unknown_error(s));
+      return PInt::reply::mk_consumed_ok_reply(1, s, unknown_error(s));
     });
   };
 
   auto fn2 = [](int a) { // int -> string
     return PStr::create([](StringState s) {
-      return PStr::reply::mk_cok_reply("string", s, unknown_error(s));
+      return PStr::reply::mk_consumed_ok_reply("string", s, unknown_error(s));
     });
   };
 
@@ -208,7 +208,7 @@ TEST_CASE("apply") {
   StringState s("abc\ndef\nghi\n");
 
   auto p = PInt::create([](StringState s) {
-    return PInt::reply::mk_cok_reply(0, s, unknown_error(s));
+    return PInt::reply::mk_consumed_ok_reply(0, s, unknown_error(s));
   });
 
   auto m1 = PFn1::pure([](int a) { return a + 99; });
