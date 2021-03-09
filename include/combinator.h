@@ -32,13 +32,13 @@ inline Parser<S, std::vector<T>> count(uint32_t n, Parser<S, T> p) {
     std::function<Parser<S, std::vector<T>>(uint32_t, std::vector<T>)>
         replicate;
 
-    replicate = [=](uint32_t n, std::vector<T> acc) {
+    replicate = [=](uint32_t n, std::vector<T> &&acc) {
       if (n == 0) {
-        return Parser<S, std::vector<T>>::pure(acc);
+        return Parser<S, std::vector<T>>::pure(std::move(acc));
 
       } else {
-        p >>= [&replicate, n, acc{std::move(acc)}](T v) {
-          acc.push_back(v);
+        return p >>= [&replicate, n, &acc](T v) {
+          acc.push_back(std::move(v));
           return replicate(n - 1, acc);
         };
       }
@@ -90,24 +90,52 @@ template <stream::state_type S, typename T>
 Parser<S, std::vector<T>> many1(Parser<S, T> p) {
   return p >>= [=](T v) {
     return many(p) >>= [=](std::vector<T> vs) {
-      vs.push_back(v);
-      std::reverse(vs.begin(), vs.end());
+      std::vector<T>::insert(vs.begin(), 1, v);
       return Parser<S, std::vector<T>>::pure(vs);
     };
   };
 }
 
 // parse `p` 0 or more times  separated by sep.
-template <stream::state_type S, typename T, typename Sep>
-Parser<S, std::vector<T>> sep_by(Parser<S, T> p, Parser<S, Sep> sep);
+template <typename P, typename Sep,
+          typename S = typename parser_trait<P>::stream,
+          typename T = typename parser_trait<P>::type>
+
+Parser<S, std::vector<T>> sep_by(P p, Sep sep) {
+  return many(sep >> p) >>=
+         [=](std::vector<T> vs) { return Parser<S, std::vector<T>>::pure(vs); };
+}
 
 // parse `p` 1 or more times separated by sep.
-template <stream::state_type S, typename T, typename Sep>
-Parser<S, std::vector<T>> sep_by1(Parser<S, T> p, Parser<S, Sep> sep);
+template <typename P, typename Sep,
+          typename S = typename parser_trait<P>::stream,
+          typename T = typename parser_trait<P>::type>
+
+Parser<S, std::vector<T>> sep_by1(P p, Sep sep) {
+  return p >>= [=](T v) {
+    return many(sep >> p) >>= [=](std::vector<T> vs) {
+      std::vector<T>::insert(vs.begin(), 1, v);
+      return Parser<S, std::vector<T>>::pure(vs);
+    };
+  };
+}
+
+// parser `p` 0 or more times separated by sepend. it's allowed to end the
+// result with a SepEnd
+template <stream::state_type S, typename T, typename SepEnd>
+Parser<S, std::vector<T>> sepend_by(Parser<S, T> p, Parser<S, SepEnd> sepend) {}
+
+// parser `p` 0 or more times separated by sepend. it's allowed to end the
+// result with a SepEnd
+template <stream::state_type S, typename T, typename SepEnd>
+Parser<S, std::vector<T>> sepend_by1(Parser<S, T> p, Parser<S, SepEnd> sepend);
 
 // parser `p` 0 or more times ended by end
-template <stream::state_type S, typename T, typename End>
-Parser<S, std::vector<T>> end_by(Parser<S, T> p, Parser<S, End> end);
+template <typename P, typename End,
+          typename S = typename parser_trait<P>::stream,
+          typename T = typename parser_trait<P>::type>
+
+Parser<S, std::vector<T>> end_by(P p, End end) {}
 
 // parser `p` 1 or more times ended by end
 template <stream::state_type S, typename T, typename End>
@@ -116,16 +144,6 @@ Parser<S, std::vector<T>> end_by1(Parser<S, T> p, Parser<S, End> end);
 // parse `p` 0 or more times  separated by sep.
 template <stream::state_type S, typename T, typename Sep>
 Parser<S, std::vector<T>> sep_by(Parser<S, T> p, Parser<S, Sep> sep);
-
-// parser `p` 0 or more times separated by sepend. it's allowed to end the
-// result with a SepEnd
-template <stream::state_type S, typename T, typename SepEnd>
-Parser<S, std::vector<T>> sepend_by(Parser<S, T> p, Parser<S, SepEnd> sepend);
-
-// parser `p` 0 or more times separated by sepend. it's allowed to end the
-// result with a SepEnd
-template <stream::state_type S, typename T, typename SepEnd>
-Parser<S, std::vector<T>> sepend_by1(Parser<S, T> p, Parser<S, SepEnd> sepend);
 
 template <stream::state_type S, typename T>
 Parser<S, T> chainl(Parser<S, T> p, Parser<S, std::function<T(T, T)>> fn, T t);
@@ -230,4 +248,5 @@ inline Parser<StringState, std::string> str =
     many(any_char).map([](std::vector<char> charvec) {
       return std::string(charvec.begin(), charvec.end());
     });
+
 } // namespace cppparsec

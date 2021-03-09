@@ -62,7 +62,7 @@ public:
   }
 
   // make some smart constructors to avoid invalid state.
-  // If we only only create Reply with these functions we will never have
+  // If we only create Reply with these functions, we will never have
   // invalid Reply. e.g a empty reply with non std::nullopt value.
 
   // the stream is consumed and no error occurs.
@@ -86,9 +86,7 @@ public:
   }
 };
 
-/*
- * Define some useful types alias here.
- * */
+// Define some useful types alias here.
 
 template <stream::state_type S, typename T>
 using OkContinuation = std::function<bool(const Reply<S, T> &)>;
@@ -429,10 +427,8 @@ Parser<S, T> Parser<S, T>::alt(Parser<S, T> n) {
   });
 }
 
-/*
- * | is a abelian group, * is a non commutative monoid.
- * with two identities respect to each operation we constructed a ring!
- */
+// | is a abelian group, * is a non commutative monoid.
+// with two identities respect to each operation we constructed a ring!
 
 template <stream::state_type S, typename T>
 Parser<S, T> operator|(Parser<S, T> p, Parser<S, T> q) {
