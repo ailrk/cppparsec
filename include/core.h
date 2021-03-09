@@ -270,21 +270,22 @@ Parser<S, U> Parser<S, T>::bind(Fm fm) {
                      return cont.cerr(error);
                    };
 
-                   {
+                   Parser<S, U> m = fm(reply.value.value());
+                   return m.unparser(
 
-                     Parser<S, U> m = fm(reply.value.value());
-                     return m.unparser(state, {
+                       state,
 
-                                                  .cok = cok,
+                       {
 
-                                                  .cerr = cerr,
+                           .cok = cok,
 
-                                                  .eok = peok,
+                           .cerr = cerr,
 
-                                                  .eerr = peerr
+                           .eok = peok,
 
-                                              });
-                   }
+                           .eerr = peerr
+
+                       });
                  },
 
                  cont.cerr,
@@ -306,18 +307,22 @@ Parser<S, U> Parser<S, T>::bind(Fm fm) {
                      return cont.eerr(e);
                    };
 
-                   {
-                     Parser<S, U> m = fm(reply.value.value());
-                     return m.unparser(state, {
+                   Parser<S, U> m = fm(reply.value.value());
+                   return m.unparser(
 
-                                                  .cok = cok,
+                       state,
 
-                                                  .cerr = cerr,
+                       {
 
-                                                  .eok = peok,
+                           .cok = cok,
 
-                                                  .eerr = peerr});
-                   }
+                           .cerr = cerr,
+
+                           .eok = peok,
+
+                           .eerr = peerr
+
+                       });
                  },
 
                  cont.eerr
@@ -357,6 +362,7 @@ Parser<S, T> onep([](S state, Conts<S, T> cont) {
 // input, the input will not be rewind when parsing `n`.
 template <stream::state_type S, typename T>
 Parser<S, T> Parser<S, T>::alt(Parser<S, T> n) {
+
   return Parser([=, m = unparser](S state, Conts<S, T> cont) {
     auto meerr = [=](ParseError error) { // when m fails, parse n.
       auto neok = [=](Reply<S, T> reply) {
@@ -365,30 +371,39 @@ Parser<S, T> Parser<S, T>::alt(Parser<S, T> n) {
       };
 
       auto neerr = [=](ParseError error1) { return cont.eerr(error + error1); };
-      return n.unparser(state, {
 
-                                   .cok = cont.cok,
+      return n.unparser(
 
-                                   .cerr = cont.cerr,
+          state,
 
-                                   .eok = neok,
+          {
 
-                                   .eerr = neerr
+              .cok = cont.cok,
 
-                               });
+              .cerr = cont.cerr,
+
+              .eok = neok,
+
+              .eerr = neerr
+
+          });
     };
 
-    return p(state, {
+    return p(
 
-                        .cok = cont.cok,
+        state,
 
-                        .cerr = cont.cerr,
+        {
 
-                        .eok = cont.eok,
+            .cok = cont.cok,
 
-                        .eerr = meerr
+            .cerr = cont.cerr,
 
-                    });
+            .eok = cont.eok,
+
+            .eerr = meerr
+
+        });
   });
 }
 
@@ -418,17 +433,21 @@ namespace cppparsec {
 template <stream::state_type S, typename T>
 Parser<S, T> attempt(Parser<S, T> p) {
   return Parser([=](S state, Conts<S, T> cont) {
-    return p.unparser(state, {
+    return p.unparser(
 
-                                 .cok = cont.cok,
+        state,
 
-                                 .cerr = cont.eerr,
+        {
 
-                                 .eok = cont.eok,
+            .cok = cont.cok,
 
-                                 .eerr = cont.eerr
+            .cerr = cont.eerr,
 
-                             });
+            .eok = cont.eok,
+
+            .eerr = cont.eerr
+
+        });
   });
 }
 
@@ -443,22 +462,27 @@ Parser<S, T> look_ahead(Parser<S, T> p) {
       rep1.error = unknown_error(state);
       return cont.eok(rep1);
     };
-    return p.unparser(state, {
+    return p.unparser(
 
-                                 .cok = eok1,
+        state,
 
-                                 .cerr = cont.cerr,
+        {
 
-                                 .eok = eok1,
+            .cok = eok1,
 
-                                 .eerr = cont.eerr
+            .cerr = cont.cerr,
 
-                             });
+            .eok = eok1,
+
+            .eerr = cont.eerr
+
+        });
   });
 }
 
 template <stream::state_type S, typename T, typename AccumFn>
 Parser<S, std::vector<T>> many_accum(AccumFn fn, Parser<S, T> p) {
+
   static_assert(
       std::is_convertible_v<AccumFn, std::function<T(T, std::vector<T>)>>,
       "AccumFn has the wrong type");
@@ -482,17 +506,21 @@ Parser<S, std::vector<T>> many_accum(AccumFn fn, Parser<S, T> p) {
         return cont.cok(rep1);
       };
 
-      return p.unparser(reply.state, {
+      return p.unparser(
 
-                                         .cok = cok,
+          reply.state,
 
-                                         .cerr = cont.cerr,
+          {
 
-                                         .eok = cont.eok,
+              .cok = cok,
 
-                                         .eerr = eerr
+              .cerr = cont.cerr,
 
-                                     });
+              .eok = cont.eok,
+
+              .eerr = eerr
+
+          });
     };
 
     auto walk_start = [=](Reply<S, T> reply) { return walk(); };
@@ -502,17 +530,21 @@ Parser<S, std::vector<T>> many_accum(AccumFn fn, Parser<S, T> p) {
       return cont.eok();
     };
 
-    return p.unparser(state, {
+    return p.unparser(
 
-                                 .cok = walk_start,
+        state,
 
-                                 .cerr = cont.cerr,
+        {
 
-                                 .eok = cont.eok,
+            .cok = walk_start,
 
-                                 .eerr = eerr
+            .cerr = cont.cerr,
 
-                             });
+            .eok = cont.eok,
+
+            .eerr = eerr
+
+        });
   });
 }
 
@@ -558,6 +590,7 @@ Parser<S, T> token(PrettyPrint pretty_print, Match match) {
   static_assert(
       std::is_convertible_v<PrettyPrint, std::function<std::string(V)>>,
       "pretty printer with wrong type");
+
   static_assert(
       std::is_convertible_v<Match, std::function<std::optional<T>(V)>>,
       "match has the wrong type");
@@ -584,7 +617,6 @@ Parser<S, T> token(PrettyPrint pretty_print, Match match) {
       reply.error = reply.error + unknown_error(state);
       return cont.cok(reply);
 
-      return cont.cok(reply);
     } else {
       return cont.eerr(unexpect_error(state.get_position(), pretty_print(v)));
     }
@@ -628,17 +660,21 @@ Parser<S, T> labels(Parser<S, T> p, const std::vector<std::string> &msgs) {
       return cont.eerr(error);
     };
 
-    return p.unparser(state, {
+    return p.unparser(
 
-                                 .cok = cont.cok,
+        state,
 
-                                 .cerr = cont.cerr,
+        {
 
-                                 .eok = cont.eok1,
+            .cok = cont.cok,
 
-                                 .eerr = eerr1
+            .cerr = cont.cerr,
 
-                             });
+            .eok = cont.eok1,
+
+            .eerr = eerr1
+
+        });
   });
 }
 
