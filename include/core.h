@@ -141,15 +141,21 @@ public:
   // othe parsers by some combinators to create a new parser p2, and use both
   // p1 and p2. The lifetime of this scheme can be tricky to handle.
   //
-  // It will be very wasteful if we copy both p1 to p2.
-  // if we pass by reference we will lose intermediate parser in a long
-  // expression. If we move p1 we will lose the standalone parse.
+  // 1. It will be very wasteful if we copy both p1 to p2.
+  // 2. If we pass by reference we will lose intermediate parser in a long
+  //    expression. e.g p = p1.map(f1).map(f2);
+  //    the parser created by p1.map(f1) lives till the end of the statement.
+  // 3. If we move p1 into p2 we can't use it as a standalone parser
+  // anymore.
   //
-  // Shared ptr introduce 8 bit more overhead, but it nicely cover all cases
-  // anove above.
+  // Shared ptr introduce more 8 bytes overhead, but it nicely cover all cases
+  // above.
   //
   // Btw the whole parser is just a wrapper over the shared_ptr,
   // copy Parser will copy 16 bytes.
+  //
+  // Continuation and shared ptr unparser are implementation details, and you should
+  // never need to interact with them direclty.
   std::shared_ptr<ParserFn<S, T>> unparser;
 
   Parser() = default;
