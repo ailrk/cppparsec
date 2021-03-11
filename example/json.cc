@@ -54,5 +54,5 @@ auto bool_parser = (str("true") | str("false")).map([](std::string s) -> bool {
 
 auto int_parser = many(digit).map([](std::vector<char> vs) -> int {
   std::string s(vs.begin(), vs.end());
-  return std::atof(s.c_str());
+  return std::atoi(s.c_str());
 });

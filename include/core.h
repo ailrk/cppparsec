@@ -33,10 +33,15 @@ template <stream::state_type S, typename T> class Reply {
 public:
   using type = T;
   using stream = T;
+
   bool consumed;
+
   bool ok;
+
   std::optional<T> value;
+
   S state;
+
   ParseError error;
 
   Reply() : consumed(false), ok(false), value(), state(), error() {}
@@ -113,6 +118,7 @@ template <stream::state_type S, typename T> class Parser;
 // linker quirks for friend functions.
 template <stream::state_type S, typename T>
 Parser<S, T> operator|(Parser<S, T>, Parser<S, T>);
+
 template <stream::state_type S, typename T>
 Parser<S, T> operator*(Parser<S, T>, Parser<S, T>);
 
@@ -129,31 +135,33 @@ static Parser<S, T> make_parser(std::function<Reply<S, T>(S)> transition);
 
 template <stream::state_type S, typename T> class Parser {
 
-  // TODO 2021-03-09:
-  // Convert unparser to a shared_ptr.
-  // The entire Parser class is just a wrapper over unparser, so it should be
-  // fairly small. Once we change it to shared_ptr, copying a parser of takes
-  // 16 bytes, which can is neglible.
-  //
-  // Using shared_ptr here so we can ensure the life time of unparser last
-  // longer than the wrapper type. This allows us to write something like
-  //    auto q = p.map(f1).map(f2);
-  //    q();
-  // If we capture unparser by reference, the intermediate parser created in the
-  // middle of the chain will destruct at the end of the statement.
 public:
   using reply = Reply<S, T>;
   using type = T;
   using stream = S;
-  ParserFn<S, T> unparser;
+
+  // Using shared_ptr here so we can ensure the life time of unparser last
+  // longer than the wrapper type. This allows us to write something like
+  //
+  //    auto q = p.map(f1).map(f2);
+  //    q();
+  //
+  // If we capture unparser by reference, the intermediate parser created in the
+  // middle of the chain will destruct at the end of the statement.
+  // copy Parser will just copy the shared_ptr.
+  std::shared_ptr<ParserFn<S, T>> unparser;
 
   Parser() = default;
 
-  Parser(const ParserFn<S, T> &parser) : unparser(parser) {}
   Parser(const Parser<S, T> &) = default;
 
-  Parser(ParserFn<S, T> &&parser) : unparser(std::move(parser)) {}
-  Parser(Parser<S, T> &&) = default;
+  Parser(Parser<S, T> &&parser) = default;
+
+  Parser(const ParserFn<S, T> &parse)
+      : unparser(std::make_shared<ParserFn<S, T>>(parse)) {}
+
+  Parser(ParserFn<S, T> &&parse)
+      : unparser(std::make_shared<ParserFn<S, T>>(std::move(parse))) {}
 
   Reply<S, T> operator()(const S &state);
 
@@ -226,7 +234,7 @@ Reply<S, T> Parser<S, T>::operator()(const S &state) {
     return r.ok;
   };
 
-  unparser(
+  (*unparser)(
 
       state,
 
@@ -263,7 +271,7 @@ Parser<S, U> Parser<S, T>::map(const Fn &fn) {
           return cont.consumed_ok(reply.map(fn));
         };
 
-        return p(
+        return (*p)(
 
             state,
 
@@ -306,7 +314,7 @@ Parser<S, U> Parser<S, T>::bind(Fm fm) {
       };
 
       Parser<S, U> m = fm(reply.value.value());
-      return m.unparser(
+      return (*m.unparser)(
 
           state,
 
@@ -335,7 +343,7 @@ Parser<S, U> Parser<S, T>::bind(Fm fm) {
       };
 
       Parser<S, U> m = fm(reply.value.value());
-      return m.unparser(
+      return (*m.unparser)(
 
           state,
 
@@ -347,12 +355,12 @@ Parser<S, U> Parser<S, T>::bind(Fm fm) {
           });
     };
 
-    return p(state,
+    return (*p)(state,
 
-             {.consumed_ok = consumer_ok,
-              .consumed_err = cont.consumed_err,
-              .empty_ok = empty_ok,
-              .empty_err = cont.empty_err});
+                {.consumed_ok = consumer_ok,
+                 .consumed_err = cont.consumed_err,
+                 .empty_ok = empty_ok,
+                 .empty_err = cont.empty_err});
   });
 }
 
@@ -402,7 +410,7 @@ Parser<S, T> Parser<S, T>::alt(Parser<S, T> n) {
         return cont.empty_err(error + error1);
       };
 
-      return n.unparser(
+      return (*n.unparser)(
 
           state,
 
@@ -414,7 +422,7 @@ Parser<S, T> Parser<S, T>::alt(Parser<S, T> n) {
           });
     };
 
-    return m(
+    return (*m)(
 
         state,
 
@@ -460,7 +468,7 @@ template <stream::state_type S, typename T>
 Parser<S, T> attempt(Parser<S, T> p) {
 
   return Parser([p](S state, Conts<S, T> cont) {
-    return p.unparser(
+    return (*p.unparser)(
 
         state,
 
@@ -486,7 +494,7 @@ Parser<S, T> look_ahead(Parser<S, T> p) {
       return cont.empty_ok(rep1);
     };
 
-    return p.unparser(
+    return (*p.unparser)(
 
         state,
 
@@ -514,7 +522,7 @@ Parser<S, std::vector<T>> many_accum(AccumFn fn, Parser<S, T> p) {
     std::function<bool(std::vector<T> acc, Reply<S, T> reply)> walk;
 
     walk = [=](std::vector<T> acc, Reply<S, T> reply) {
-      return p.unparser(
+      return (*p.unparser)(
 
           reply.state,
 
@@ -545,7 +553,7 @@ Parser<S, std::vector<T>> many_accum(AccumFn fn, Parser<S, T> p) {
           });
     };
 
-    return p.unparser(
+    return (*p.unparser)(
 
         state,
 
@@ -685,7 +693,7 @@ Parser<S, T> labels(Parser<S, T> p, const std::vector<std::string> &msgs) {
       return cont.empty_err(error);
     };
 
-    return p.unparser(
+    return (*p.unparser)(
 
         state,
 

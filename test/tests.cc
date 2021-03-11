@@ -228,5 +228,3 @@ TEST_CASE("many_accum") {}
 TEST_CASE("algebra") {}
 
 TEST_CASE("many") {}
-
-
