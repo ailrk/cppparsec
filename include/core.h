@@ -1,9 +1,3 @@
-// TODO convert all pass by value to better alternative.
-// Plan:
-// 1. turn unparser to shared_ptr
-// 2. capture unpaser by value
-// 3. capture others by const ref
-// 4. handle reply and it's life time nicely. ()
 #pragma once
 #include "error.h"
 #include "stream.h"
@@ -141,21 +135,29 @@ public:
   using stream = S;
 
   // Using shared_ptr here so we can ensure the life time of unparser last
-  // longer than the wrapper type. This allows us to write something like
+  // longer than the wrapper type.
   //
-  //    auto q = p.map(f1).map(f2);
-  //    q();
+  // Often times we want to define a standalone parser p1, compose it with
+  // othe parsers by some combinators to create a new parser p2, and use both
+  // p1 and p2. The lifetime of this scheme can be tricky to handle.
   //
-  // If we capture unparser by reference, the intermediate parser created in the
-  // middle of the chain will destruct at the end of the statement.
-  // copy Parser will just copy the shared_ptr.
+  // It will be very wasteful if we copy both p1 to p2.
+  // if we pass by reference we will lose intermediate parser in a long
+  // expression. If we move p1 we will lose the standalone parse.
+  //
+  // Shared ptr introduce 8 bit more overhead, but it nicely cover all cases
+  // anove above.
+  //
+  // Btw the whole parser is just a wrapper over the shared_ptr,
+  // copy Parser will copy 16 bytes.
   std::shared_ptr<ParserFn<S, T>> unparser;
 
   Parser() = default;
 
   Parser(const Parser<S, T> &) = default;
-
   Parser(Parser<S, T> &&parser) = default;
+  Parser &operator=(const Parser<S, T> &) = default;
+  Parser &operator=(Parser<S, T> &&parser) = default;
 
   Parser(const ParserFn<S, T> &parse)
       : unparser(std::make_shared<ParserFn<S, T>>(parse)) {}
@@ -223,11 +225,12 @@ template <stream::state_type S, typename T>
 Reply<S, T> Parser<S, T>::operator()(const S &state) {
   Reply<S, T> r;
 
-  // the entrance callback.
-  // one thing to notice about cps is that new continuation needs to refer to
-  // environment from the caller, and all of these environments needs to be
-  // kepts on the heap. If we have a very deep recursion it can use up
-  // memory.
+  // The entrance callback.
+  // One thing to notice about cps:
+  //  New continuation needs to refer to the
+  //  environment from the caller, all of these environments needs to be
+  //  kepts on the heap. If we have a very deep recursion it can use up
+  //  memory.
 
   auto ok = [&r](auto rep) -> bool {
     r = rep;

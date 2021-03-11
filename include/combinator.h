@@ -242,46 +242,60 @@ inline Parser<StringState, char> none_of(std::vector<char> chars) {
 inline Parser<StringState, char> space =
     satisfy([](char c) { return isspace(c); }) ^ "space";
 
-// TODO: Why do I need this <>?
-// because it's function template, you also have overload issue.
+// skip continous spaces.
 inline Parser<StringState, std::monostate> spaces =
     skip_many(space) ^ "white space";
 
+// unix new line
 inline Parser<StringState, char> newline = ch('\n') ^ "lf new-line";
 
+// crlf new line
 inline Parser<StringState, char> crlf =
     (ch('\r') >> ch('\n')) ^ "crlf new-line";
+
+// new line
 inline Parser<StringState, char> endofline = (newline | crlf) ^ "new-line";
 
+// tab
 inline Parser<StringState, char> tab = ch('\t') ^ "tab";
 
+// parse uppercase letters
 inline Parser<StringState, char> upper =
     satisfy([](char c) { return std::isupper(c); }) ^ "uppercase letter";
 
+// parse lower case letters
 inline Parser<StringState, char> lower =
     satisfy([](char c) { return std::islower(c); }) ^ "lowercase letter";
 
+// parse alpha numeral letters.
 inline Parser<StringState, char> alpha_num =
     satisfy([](char c) { return std::isalnum(c); }) ^ "alpha numeral letter";
 
+// parse letters.
 inline Parser<StringState, char> alpha =
     satisfy([](char c) { return std::isalpha(c); }) ^ "alpha letter";
 
+// parse letters
 inline Parser<StringState, char> letter = alpha;
 
+// parse decimal digits
 inline Parser<StringState, char> digit =
     satisfy([](char c) { return std::isdigit(c); }) ^ "digit letter";
 
+// parse hex digits.
 inline Parser<StringState, char> hex_digit =
     (one_of({'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F'}) |
      digit) ^
     "hex digit letter";
 
+// parse oct digits.
 inline Parser<StringState, char> oct_digit =
     (one_of({'1', '2', '3', '4', '5', '6', '7', '0'})) ^ "hex digit letter";
 
+// parse anuy characters.
 inline Parser<StringState, char> any_char = satisfy(const_(true));
 
+// parse string.
 inline Parser<StringState, std::string> str(std::string s) {
 
   if (s == "") {

@@ -41,7 +41,9 @@ struct Position {
   }
 };
 
-namespace stream {
+} // namespace cppparsec
+
+namespace cppparsec::stream {
 
 // template <typename T> concept stream_type = is_stream<T>::value;
 
@@ -205,6 +207,4 @@ std::unique_ptr<StringState> StringState::eat(Position other_pos) const {
 }
 
 std::unique_ptr<StringState> StringState::eat() const { return eat(1); }
-} // namespace stream
-
-} // namespace cppparsec
+} // namespace cppparsec::stream
