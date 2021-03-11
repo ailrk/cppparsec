@@ -65,16 +65,18 @@ TEST_CASE("Create StirngState", "StringState") {
     constexpr StringState s1("abc\ndef\nghi\n");
     Position pos{3, 2};
     auto s2 = s1.eat(pos);
-    std::cout << s2->get_position().to_string() << std::endl;
+    REQUIRE(s2->get_position().line == 3);
+    REQUIRE(s2->get_position().col == 3);
   }
 
   SECTION("next position with eat") {
     using cppparsec::Position;
     constexpr StringState s1("abc\ndef\nghi\n");
     Position pos = s1.next_position(4);
-    std::cout << "pos: " << pos.to_string() << std::endl;
     auto s2 = s1.eat(pos);
-    std::cout << s2->get_position().to_string() << std::endl;
+    // TODO: pos is 2, 1 though
+    REQUIRE(s2->get_position().line == 2);
+    REQUIRE(s2->get_position().col == 2);
   }
 }
 
@@ -116,6 +118,42 @@ TEST_CASE("parser basis") {
     });
     auto r = p(s);
     REQUIRE(!r.value.has_value());
+  }
+}
+
+TEST_CASE("parser construction") {
+  using namespace cppparsec;
+  using namespace cppparsec::stream;
+  using PChar = Parser<StringState, char>;
+  StringState s("abc\ndef\nghi\n");
+
+  SECTION("parser size") {
+    auto p = PChar::create([](StringState s) {
+      return PChar::reply::mk_empty_err_reply(s, unknown_error(s));
+    });
+
+    REQUIRE(sizeof(p) == 16);
+  }
+
+  SECTION("parser copy") {
+    auto p = PChar::create([](StringState s) {
+      return PChar::reply::mk_empty_err_reply(s, unknown_error(s));
+    });
+
+    auto q = p;
+    REQUIRE(p.unparser.get() == q.unparser.get());
+    REQUIRE(p.unparser.use_count() == 2);
+  }
+
+  SECTION("parser move") {
+    auto p = PChar::create([](StringState s) {
+      return PChar::reply::mk_empty_err_reply(s, unknown_error(s));
+    });
+
+    auto q(std::move(p));
+    REQUIRE(p.unparser == nullptr);
+    REQUIRE(sizeof(p) == 0);
+    REQUIRE(sizeof(q) == 16);
   }
 }
 
