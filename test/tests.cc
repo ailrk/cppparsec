@@ -6,6 +6,9 @@
 #include <signal.h>
 #include <vector>
 
+auto printer = [](char v) { return std::string(1, v); };
+auto match = [](char v) { return true; };
+
 TEST_CASE("Create StirngState", "StringState") {
   using namespace cppparsec::stream;
   StringState s("abc\ndef\nghi\n");
@@ -292,9 +295,6 @@ TEST_CASE("token") {
   using namespace cppparsec::stream;
   StringState s("abc\ndef\nghi\n");
 
-  auto printer = [](char v) { return std::string(1, v); };
-  auto match = [](char v) { return true; };
-
   SECTION("token 1") {
 
     auto p1 = token<StringState, char>(printer, match);
@@ -311,26 +311,25 @@ TEST_CASE("token") {
 }
 
 // NOTE: many must work with parser that consume some token.
-// TEST_CASE("many") {
-//   using namespace cppparsec;
-//   using namespace cppparsec::stream;
-//   using PInt = Parser<StringState, int>;
-//   auto p = PInt::pure(10);
-//   StringState s("abc\ndef\nghi\n");
+TEST_CASE("many") {
+  using namespace cppparsec;
+  using namespace cppparsec::stream;
 
-//   SECTION("many 1") {
+  auto p = token<StringState, char>(printer, match);
+  StringState s("abc\ndef\nghi\n");
 
-//     auto pints = many(p);
-//     auto r = pints(s);
+  SECTION("many 1") {
 
-//     for (auto &v : r.value.value()) {
-//       std::cout << v << " ";
-//     }
-//     std::cout << std::endl;
-//   }
+    auto pchars = many(p);
+    auto r = pchars(s);
 
-//   SECTION("many 2") {
-//   }
-// }
+    for (auto &v : r.value.value()) {
+      std::cout << v << " ";
+    }
+    std::cout << std::endl;
+  }
+
+  SECTION("many 2") {}
+}
 
 TEST_CASE("algebra") {}
