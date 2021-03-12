@@ -10,36 +10,49 @@
 
 namespace cppparsec {
 
+// Position can't change itself. it can only be updated by String.
+// the reason is Position doesn't have information about what character
+// it's rading, so it doesn't know if it need to increment col or line.
 struct Position {
   size_t line;
   size_t col;
+  size_t index; // the index in a container. e.g the index in a string.
 
   std::string to_string() {
     std::string res = "line: ";
     res += std::to_string(line);
-    res += ", ";
-    res += "col: ";
+    res += ", col: ";
     res += std::to_string(col);
+    res += ", index: ";
+    res += std::to_string(index);
 
     return res;
   }
 
+  friend int operator-(const Position &p1, const Position &p2) {
+    return p1.index - p2.index;
+  }
+
   [[nodiscard]] friend bool operator<(const Position &p1, const Position &p2) {
-    return p1 != p2 && !(p1 > p2);
+    return p1.index < p2.index;
   }
 
   [[nodiscard]] friend bool operator>(const Position &p1, const Position &p2) {
-    return (p1.line > p2.line) || ((p1.line == p2.line) && (p1.col > p2.col));
+    return p1.index > p2.index;
   }
 
   [[nodiscard]] friend bool operator==(const Position &p1, const Position &p2) {
-    return p1.col == p2.col && p1.line == p2.line;
+    return p1.index == p2.index;
   }
 
   [[nodiscard]] friend bool operator!=(const Position &p1, const Position &p2) {
     return !(p1 == p2);
   }
 };
+
+constexpr inline Position default_init_position() { return Position{1, 1, 0}; }
+
+static_assert(std::is_trivial_v<Position>, "`Position` should be trivial");
 
 } // namespace cppparsec
 
@@ -76,7 +89,7 @@ template <typename T> concept state_type = requires(T t) {
   // eat one element from the stream, return the unique pointer of the new
   // stream.
   { t.eat() }
-  ->std::same_as<std::unique_ptr<T>>;
+  ->std::same_as<T>;
 
   // calculate the next position of the token.
   { t.next_position() }
@@ -90,29 +103,34 @@ template <typename T> concept state_type = requires(T t) {
 class StringState {
 
   std::string_view data;
-  Position position;
+  std::unique_ptr<Position> position;
 
 public:
   // update stream, return a new String Stream.
   // note because it just pass a string view, copy cost almost nothing.
   using StreamType = std::string_view;
   using ValueType = char;
-  constexpr StringState(const std::string_view &s, const Position &pos)
-      : data(s), position(pos) {}
 
-  constexpr StringState(std::string_view s)
-      : data(s), position(Position{1, 1}) {}
+  StringState(const std::string_view &s, const Position &pos)
+      : data(s), position(std::make_unique<Position>(pos)) {}
 
-  constexpr StringState() : data(""), position(Position{1, 1}) {}
+  StringState(std::string_view s)
+      : data(s), position(std::make_unique<Position>(default_init_position())) {
+  }
+
+  StringState()
+      : data(""),
+        position(std::make_unique<Position>(default_init_position())) {}
 
   // copy the string stream with the same state.
   // Thisis essential for retrying.
-  constexpr StringState(const StringState &stream)
-      : data(stream.data), position(stream.position) {}
+  StringState(const StringState &stream)
+      : data(stream.data),
+        position(std::make_unique<Position>(*stream.position)) {}
 
   constexpr StringState &operator=(const StringState &stream) {
     data = stream.data;
-    position = stream.position;
+    position = std::make_unique<Position>(*stream.position);
     return *this;
   }
 
@@ -125,27 +143,31 @@ public:
 
   constexpr std::optional<std::tuple<ValueType, StreamType>> uncons() const;
 
-  std::unique_ptr<StringState> eat(Position) const;
-  std::unique_ptr<StringState> eat(size_t n) const;
-  std::unique_ptr<StringState> eat() const;
+  StringState eat(const Position &) const;
+  StringState eat(size_t n) const;
+  StringState eat() const;
 };
+
+static_assert(sizeof(StringState) == 24,
+              "StringState is too large. It should only contain a string_view "
+              "and an unique_ptr to the position");
 
 constexpr bool StringState::is_empty() const { return data.size() == 0; }
 
-constexpr size_t StringState::get_line() const { return position.line; };
+constexpr size_t StringState::get_line() const { return position->line; };
 
-constexpr size_t StringState::get_col() const { return position.col; };
+constexpr size_t StringState::get_col() const { return position->col; };
 
-constexpr Position StringState::get_position() const { return position; }
+constexpr Position StringState::get_position() const { return *position; }
 
 // the next position after taken n elements.
 // when n =  0 return the same position;
 constexpr Position StringState::next_position(size_t n) const {
   if (is_empty() && n == 0) {
-    return position;
+    return *position;
   }
 
-  Position new_position = position;
+  Position new_position = *position;
 
   for (size_t i = 0; i < n; ++i) {
     if (data[i] == '\n') {
@@ -154,6 +176,7 @@ constexpr Position StringState::next_position(size_t n) const {
     } else {
       new_position.col++;
     }
+    new_position.index++;
   }
   return new_position;
 }
@@ -173,38 +196,28 @@ StringState::uncons() const {
 
 // Eat the next n tokens, and return a new StringStream with
 // updated position.
-std::unique_ptr<StringState> StringState::eat(size_t n) const {
+StringState StringState::eat(size_t n) const {
   if (n == 0) {
-    return std::make_unique<StringState>(*this);
+    return *this;
   } else {
-    return std::make_unique<StringState>(data.substr(n), next_position(n));
+    return StringState(data.substr(n), next_position(n));
   }
 };
 
 // given a new position, eat until the current position is the same as the
 // new position.
-std::unique_ptr<StringState> StringState::eat(Position other_pos) const {
-  if (other_pos < position) {
-    return std::make_unique<StringState>(data);
-  }
-
+StringState StringState::eat(const Position &target_position) const {
   // accumulator
-  std::unique_ptr<StringState> res = std::make_unique<StringState>(*this);
-  Position pos = position;
+  StringState res = StringState(*this);
 
-  assert(res != nullptr);
-
-  // TODO now is on over
-  for (; pos != other_pos; res = res->eat()) {
-    pos = res->get_position();
-
-    if (pos > other_pos) { // other_pos doesn't exist.
-      return eat(0);
-    }
+  if (*position > target_position) {
+    return res;
   }
 
-  return res;
+  int distance = target_position - *position;
+
+  return res.eat(distance);
 }
 
-std::unique_ptr<StringState> StringState::eat() const { return eat(1); }
+StringState StringState::eat() const { return eat(1); }
 } // namespace cppparsec::stream

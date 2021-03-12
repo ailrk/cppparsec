@@ -154,8 +154,8 @@ public:
   // Btw the whole parser is just a wrapper over the shared_ptr,
   // copy Parser will copy 16 bytes.
   //
-  // Continuation and shared ptr unparser are implementation details, and you should
-  // never need to interact with them direclty.
+  // Continuation and shared ptr unparser are implementation details, and you
+  // should never need to interact with them direclty.
   std::shared_ptr<ParserFn<S, T>> unparser;
 
   Parser() = default;
@@ -379,7 +379,7 @@ Parser<S, U> Parser<S, T>::apply(M m) {
 
   auto p1 = *this >>= [=](T v) {
     return m >>= [=](Fn fn) { // pure
-      return pure(fn(v));
+      return Parser<S, U>::pure(fn(v));
     };
   };
 
@@ -645,7 +645,8 @@ Parser<S, T> token(PrettyPrint pretty_print, Match match) {
 
       // valid token, construct a new reply with the token as it's value.
       Position newpos = state.next_position();
-      state.eat(newpos);
+
+      state = state.eat(newpos);
 
       Reply<S, T> reply =
           Reply<S, T>::mk_consumed_ok_reply({v}, state, unknown_error(state));

@@ -63,10 +63,14 @@ TEST_CASE("Create StirngState", "StringState") {
   SECTION("eat until position") {
     using cppparsec::Position;
     constexpr StringState s1("abc\ndef\nghi\n");
-    Position pos{3, 2};
+    // hand calculate the arbitrary position.
+    // this should never be done in real code.
+    Position pos{3, 2, 3 + 1 + 3 + 1 + 2 - 1};
     auto s2 = s1.eat(pos);
+
     REQUIRE(s2->get_position().line == 3);
-    REQUIRE(s2->get_position().col == 3);
+    REQUIRE(s2->get_position().col == 2);
+    REQUIRE(s2->get_position().index == 9);
   }
 
   SECTION("next position with eat") {
@@ -74,9 +78,21 @@ TEST_CASE("Create StirngState", "StringState") {
     constexpr StringState s1("abc\ndef\nghi\n");
     Position pos = s1.next_position(4);
     auto s2 = s1.eat(pos);
-    // TODO: pos is 2, 1 though
+
     REQUIRE(s2->get_position().line == 2);
-    REQUIRE(s2->get_position().col == 2);
+    REQUIRE(s2->get_position().col == 1);
+    REQUIRE(s2->get_position().index == 4);
+  }
+
+  SECTION("next position is the same as currenet position") {
+    using cppparsec::Position;
+    constexpr StringState s1("abc\ndef\nghi\n");
+    Position pos = s1.next_position(0);
+    auto s2 = s1.eat(pos);
+
+    REQUIRE(s2->get_position().line == s1.get_position().line);
+    REQUIRE(s2->get_position().col == s1.get_position().col);
+    REQUIRE(s2->get_position().index == s1.get_position().index);
   }
 }
 
@@ -125,7 +141,6 @@ TEST_CASE("parser construction") {
   using namespace cppparsec;
   using namespace cppparsec::stream;
   using PChar = Parser<StringState, char>;
-  StringState s("abc\ndef\nghi\n");
 
   SECTION("parser size") {
     auto p = PChar::create([](StringState s) {
@@ -152,7 +167,6 @@ TEST_CASE("parser construction") {
 
     auto q(std::move(p));
     REQUIRE(p.unparser == nullptr);
-    REQUIRE(sizeof(p) == 0);
     REQUIRE(sizeof(q) == 16);
   }
 }
@@ -161,7 +175,6 @@ TEST_CASE("parser map") {
   using namespace cppparsec;
   using namespace cppparsec::stream;
   using PChar = Parser<StringState, char>;
-  using PInt = Parser<StringState, int>;
   StringState s("abc\ndef\nghi\n");
   auto p = PChar::create([](StringState s) {
     return PChar::reply::mk_consumed_ok_reply('c', s, unknown_error(s));
@@ -239,7 +252,6 @@ TEST_CASE("apply") {
   using namespace cppparsec;
   using namespace cppparsec::stream;
   using PInt = Parser<StringState, int>;
-  using PChar = Parser<StringState, char>;
   using PFn1 = Parser<StringState, std::function<int(int)>>;
   using PFn2 = Parser<StringState, std::function<char(int)>>;
 
@@ -258,11 +270,68 @@ TEST_CASE("apply") {
     REQUIRE(r.value.value() == 99);
   }
 
-  SECTION("apply 2") {}
+  SECTION("apply 2") {
+
+    auto p1 = p.apply(m1).apply(m2);
+    auto r = p1(s);
+    std::cout << ".." << std::endl;
+    std::cout << r.value.value() << std::endl;
+  }
+
+  SECTION("apply 3") {
+
+    auto r =
+        (p.apply(m1).apply(m2) >>= [](char v) { return PInt::pure(122); })(s);
+    std::cout << ".." << std::endl;
+    std::cout << r.value.value() << std::endl;
+  }
 }
 
-TEST_CASE("many_accum") {}
+TEST_CASE("token") {
+  using namespace cppparsec;
+  using namespace cppparsec::stream;
+  using PChar = Parser<StringState, char>;
+  StringState s("abc\ndef\nghi\n");
+
+  auto printer = [](char v) { return std::string(1, v); };
+  auto match = [](char v) { return true; };
+
+  SECTION("token 1") {
+
+    auto p1 = token<StringState, char>(printer, match);
+    auto r = p1(s);
+    std::cout << r.value.value() << std::endl;
+  }
+
+  SECTION("token 2") {
+    auto p1 = token<StringState, char>(printer, match);
+    auto p2 = p1 >> p1 >> p1 >> p1;
+    auto r = p2(s);
+    std::cout << r.value.value() << std::endl;
+  }
+}
+
+// NOTE: many must work with parser that consume some token.
+// TEST_CASE("many") {
+//   using namespace cppparsec;
+//   using namespace cppparsec::stream;
+//   using PInt = Parser<StringState, int>;
+//   auto p = PInt::pure(10);
+//   StringState s("abc\ndef\nghi\n");
+
+//   SECTION("many 1") {
+
+//     auto pints = many(p);
+//     auto r = pints(s);
+
+//     for (auto &v : r.value.value()) {
+//       std::cout << v << " ";
+//     }
+//     std::cout << std::endl;
+//   }
+
+//   SECTION("many 2") {
+//   }
+// }
 
 TEST_CASE("algebra") {}
-
-TEST_CASE("many") {}
