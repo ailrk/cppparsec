@@ -323,13 +323,11 @@ TEST_CASE("many") {
     auto pchars = many(p);
     auto r = pchars(s);
 
-    for (auto &v : r.value.value()) {
-      std::cout << v << " ";
-    }
-    std::cout << std::endl;
+    auto vec = r.value.value();
+    REQUIRE(std::string{vec.begin(), vec.end()} == "abc\ndef\nghi\n");
   }
 
   SECTION("many 2") {}
 }
 
-TEST_CASE("algebra") {}
+// TEST_CASE("algebra") {}

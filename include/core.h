@@ -274,7 +274,7 @@ Parser<S, U> Parser<S, T>::map(const Fn &fn) {
 
   return Parser<S, U>(
 
-      [fn, p = unparser](S state, Conts<S, U> cont) {
+      [&fn, p = unparser](S state, Conts<S, U> cont) {
         // map on continuation.
         auto mapped_ok = [&cont, &fn](Reply<S, T> reply) -> bool {
           return cont.consumed_ok(reply.map(fn));
@@ -530,12 +530,12 @@ Parser<S, std::vector<T>> many_accum(AccumFn fn, Parser<S, T> p) {
 
     std::function<bool(std::vector<T> acc, Reply<S, T> reply)> walk;
 
-    walk = [=](std::vector<T> acc, Reply<S, T> reply) {
+    walk = [&walk, &fn, &cont, p](std::vector<T> acc, Reply<S, T> reply) {
       return (*p.unparser)(
 
           reply.state,
 
-          {.consumed_ok = [=](Reply<S, T> reply) -> bool {
+          {.consumed_ok = [&walk, &fn, acc](Reply<S, T> reply) -> bool {
              auto v = reply.value.value();
              walk(fn(v, acc), reply);
              return reply.ok;
@@ -566,7 +566,7 @@ Parser<S, std::vector<T>> many_accum(AccumFn fn, Parser<S, T> p) {
 
         state,
 
-        {.consumed_ok = [=](Reply<S, T> reply) -> bool {
+        {.consumed_ok = [&walk](Reply<S, T> reply) -> bool {
            walk({}, reply);
            return reply.ok;
          },
@@ -578,7 +578,7 @@ Parser<S, std::vector<T>> many_accum(AccumFn fn, Parser<S, T> p) {
            return reply.ok;
          },
 
-         .empty_err = [=](ParseError error) -> bool {
+         .empty_err = [&cont, state](ParseError error) -> bool {
            auto reply =
                Reply<S, std::vector<T>>::mk_empty_ok_reply({{}}, state, error);
            return cont.empty_ok(reply);
@@ -633,7 +633,7 @@ Parser<S, T> token(PrettyPrint pretty_print, Match match) {
       std::is_convertible_v<Match, std::function<std::optional<T>(V)>>,
       "match has the wrong type");
 
-  return Parser<S, T>([=](S state, Conts<S, T> cont) {
+  return Parser<S, T>([&match, &pretty_print](S state, Conts<S, T> cont) {
     std::optional<std::tuple<V, D>> r = state.uncons(); // fetch from stream.
     if (!r.has_value()) {
       auto error = unexpect_error(state.get_position(), "The stream is empty");
@@ -687,8 +687,8 @@ static void add_expected_message(ParseError &error,
 template <stream::state_type S, typename T>
 Parser<S, T> labels(Parser<S, T> p, const std::vector<std::string> &msgs) {
 
-  return Parser<S, T>([=](S state, Conts<S, T> cont) {
-    auto empty_ok = [=](Reply<S, T> reply) -> bool {
+  return Parser<S, T>([&msgs, p](S state, Conts<S, T> cont) {
+    auto empty_ok = [&cont, &msgs](Reply<S, T> reply) -> bool {
       Reply<S, T> rep1(reply);
       ParseError &error = rep1.error;
 
@@ -696,7 +696,7 @@ Parser<S, T> labels(Parser<S, T> p, const std::vector<std::string> &msgs) {
       return cont.empty_ok(rep1);
     };
 
-    auto empty_err = [=](ParseError error) -> bool {
+    auto empty_err = [&cont, &msgs](ParseError error) -> bool {
       add_expected_message(error, msgs);
       return cont.empty_err(error);
     };
