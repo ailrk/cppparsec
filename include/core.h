@@ -567,7 +567,8 @@ Parser<S, std::vector<T>> many_accum(AccumFn fn, Parser<S, T> p) {
         state,
 
         {.consumed_ok = [&walk](Reply<S, T> reply) -> bool {
-           walk({}, reply);
+           auto v = reply.value.value();
+           walk({v}, reply);
            return reply.ok;
          },
 

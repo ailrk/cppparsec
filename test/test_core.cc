@@ -6,6 +6,8 @@
 #include <signal.h>
 #include <vector>
 
+// baseline test, test each individule parser.
+
 auto printer = [](char v) { return std::string(1, v); };
 auto match = [](char v) { return true; };
 
@@ -277,16 +279,14 @@ TEST_CASE("apply") {
 
     auto p1 = p.apply(m1).apply(m2);
     auto r = p1(s);
-    std::cout << ".." << std::endl;
-    std::cout << r.value.value() << std::endl;
+    REQUIRE(r.value.value() == 'd');
   }
 
   SECTION("apply 3") {
 
     auto r =
         (p.apply(m1).apply(m2) >>= [](char v) { return PInt::pure(122); })(s);
-    std::cout << ".." << std::endl;
-    std::cout << r.value.value() << std::endl;
+    REQUIRE(r.value.value() == 122);
   }
 }
 
@@ -299,14 +299,14 @@ TEST_CASE("token") {
 
     auto p1 = token<StringState, char>(printer, match);
     auto r = p1(s);
-    std::cout << r.value.value() << std::endl;
+    REQUIRE(r.value.value() == 'a');
   }
 
   SECTION("token 2") {
     auto p1 = token<StringState, char>(printer, match);
     auto p2 = p1 >> p1 >> p1 >> p1 >> p1;
     auto r = p2(s);
-    std::cout << "value is: " << r.value.value() << std::endl;
+    REQUIRE(r.value.value() == 'd');
   }
 }
 
@@ -326,8 +326,6 @@ TEST_CASE("many") {
     auto vec = r.value.value();
     REQUIRE(std::string{vec.begin(), vec.end()} == "abc\ndef\nghi\n");
   }
-
-  SECTION("many 2") {}
 }
 
 // TEST_CASE("algebra") {}
