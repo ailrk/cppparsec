@@ -8,8 +8,8 @@
 
 // baseline test, test each individule parser.
 
-auto printer = [](char v) { return std::string(1, v); };
-auto match = [](char v) { return true; };
+auto printer = []([[maybe_unused]] char v) { return std::string(1, v); };
+auto match = []([[maybe_unused]] char v) { return true; };
 
 TEST_CASE("Create StirngState", "StringState") {
   using namespace cppparsec::stream;
@@ -185,10 +185,10 @@ TEST_CASE("parser map") {
     return PChar::reply::mk_consumed_ok_reply('c', s, unknown_error(s));
   });
 
-  auto fn = [](char v) -> int { return 1; };
-  auto fn1 = [](int v) -> char { return 'a'; };
-  auto fn2 = [](char v) -> double { return 11.1; };
-  auto fn3 = [](double v) -> std::string { return "string"; };
+  auto fn = []([[maybe_unused]] char v) -> int { return 1; };
+  auto fn1 = []([[maybe_unused]] int v) -> char { return 'a'; };
+  auto fn2 = []([[maybe_unused]] char v) -> double { return 11.1; };
+  auto fn3 = []([[maybe_unused]] double v) -> std::string { return "string"; };
 
   SECTION("int -> char") {
     auto p1 = p.map(fn);
@@ -215,19 +215,19 @@ TEST_CASE("bind") {
     return PChar::reply::mk_consumed_ok_reply('c', s, unknown_error(s));
   });
 
-  auto fn = [](int a) { // int -> m char
+  auto fn = []([[maybe_unused]] int a) { // int -> m char
     return PChar::create([](StringState s) {
       return PChar::reply::mk_consumed_ok_reply('c', s, unknown_error(s));
     });
   };
 
-  auto fn1 = [](char a) { // char -> m int
+  auto fn1 = []([[maybe_unused]] char a) { // char -> m int
     return PInt::create([](StringState s) {
       return PInt::reply::mk_consumed_ok_reply(1, s, unknown_error(s));
     });
   };
 
-  auto fn2 = [](int a) { // int -> string
+  auto fn2 = []([[maybe_unused]] int a) { // int -> string
     return PStr::create([](StringState s) {
       return PStr::reply::mk_consumed_ok_reply("string", s, unknown_error(s));
     });
@@ -267,7 +267,7 @@ TEST_CASE("apply") {
   });
 
   auto m1 = PFn1::pure([](int a) { return a + 99; });
-  auto m2 = PFn2::pure([](int a) { return 'd'; });
+  auto m2 = PFn2::pure([]([[maybe_unused]] int a) { return 'd'; });
 
   SECTION("apply 1") {
     auto p1 = p.apply(m1);
@@ -284,8 +284,8 @@ TEST_CASE("apply") {
 
   SECTION("apply 3") {
 
-    auto r =
-        (p.apply(m1).apply(m2) >>= [](char v) { return PInt::pure(122); })(s);
+    auto r = (p.apply(m1).apply(m2) >>=
+              []([[maybe_unused]] char v) { return PInt::pure(122); })(s);
     REQUIRE(r.value.value() == 122);
   }
 }
@@ -311,7 +311,7 @@ TEST_CASE("token") {
 }
 
 // NOTE: many must work with parser that consume some token.
-TEST_CASE("many") {
+TEST_CASE("many related") {
   using namespace cppparsec;
   using namespace cppparsec::stream;
 
@@ -325,6 +325,13 @@ TEST_CASE("many") {
 
     auto vec = r.value.value();
     REQUIRE(std::string{vec.begin(), vec.end()} == "abc\ndef\nghi\n");
+  }
+
+  SECTION("skip_many") {
+
+    auto pskip = skip_many(any_char) >> newline >> any_char;
+    auto r = pskip(s);
+    std::cout << r.value.value() << std::endl;
   }
 }
 

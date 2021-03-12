@@ -154,9 +154,9 @@ static_assert(sizeof(StringState) == 24,
 
 bool StringState::is_empty() const { return data.size() == 0; }
 
-size_t StringState::get_line() const { return position->line; };
+size_t StringState::get_line() const { return position->line; }
 
-size_t StringState::get_col() const { return position->col; };
+size_t StringState::get_col() const { return position->col; }
 
 Position StringState::get_position() const { return *position; }
 
@@ -181,13 +181,10 @@ Position StringState::next_position(size_t n) const {
   return new_position;
 }
 
-Position StringState::next_position() const {
-  return next_position(1);
-}
+Position StringState::next_position() const { return next_position(1); }
 
 // Return the first element and the rest stream.
-std::optional<std::tuple<char, std::string_view>>
-StringState::uncons() const {
+std::optional<std::tuple<char, std::string_view>> StringState::uncons() const {
   if (is_empty()) {
     return {};
   }
@@ -202,7 +199,7 @@ StringState StringState::eat(size_t n) const {
   } else {
     return StringState(data.substr(n), next_position(n));
   }
-};
+}
 
 // given a new position, eat until the current position is the same as the
 // new position.

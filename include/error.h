@@ -35,7 +35,7 @@ private:
   Messages messages;
 
 public:
-  ParseError() : position(Position{1, 1}), messages() {}
+  ParseError() : position(Position{1, 1, 0}), messages() {}
   ParseError(const Position &position, const Messages &messages)
       : position(position), messages(messages) {}
 

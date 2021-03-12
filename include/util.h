@@ -32,6 +32,6 @@ template <typename F> struct function_traits {
 };
 
 auto const_(auto a) {
-  return [=](auto b) { return a; };
+  return [=]([[maybe_unused]] auto _) { return a; };
 }
 } // namespace cppparsec::util

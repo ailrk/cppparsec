@@ -222,7 +222,7 @@ public:
 
   template <typename U>
   friend Parser<S, U> operator>>(Parser<S, T> p, Parser<S, U> q) {
-    return p >>= [=](T _) { return q; };
+    return p >>= [=]([[maybe_unused]] T _) { return q; };
   }
 };
 
@@ -551,7 +551,7 @@ Parser<S, std::vector<T>> many_accum(AccumFn fn, Parser<S, T> p) {
                  return reply.ok;
                },
 
-           .empty_err = [=](ParseError error) -> bool {
+           .empty_err = [=]([[maybe_unused]] ParseError error) -> bool {
              Reply<S, std::vector<T>> rep1;
              rep1 = Reply<S, std::vector<T>>::mk_consumed_ok_reply(
                  acc, reply.state, reply.error);
@@ -600,7 +600,7 @@ Parser<S, std::vector<T>> many(P p) {
         return acc;
       },
       p);
-};
+}
 
 // TODO: now just make a new empty vector. try to reuse empty acc instead.
 // skip many and return nothing.
@@ -610,10 +610,13 @@ template <typename P,
           typename T = typename parser_trait<P>::type>
 
 Parser<S, std::monostate> skip_many(P p) {
-  return many_accum([](T v, std::vector<T> acc) { return std::vector<T>{}; },
-                    p) >>
+  return many_accum(
+             []([[maybe_unused]] T v, [[maybe_unused]] std::vector<T> acc) {
+               return std::vector<T>{};
+             },
+             p) >>
          Parser<S, std::monostate>::pure({});
-};
+}
 
 // primitive term parser.
 // Takes a customized pretty printer, because we might want to use different
