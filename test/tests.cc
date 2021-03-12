@@ -19,17 +19,17 @@ TEST_CASE("Create StirngState", "StringState") {
 
   SECTION("eat 1 token") {
     auto new_s = s.eat();
-    auto [v, st] = new_s->uncons().value();
+    auto [v, st] = new_s.uncons().value();
     REQUIRE(v == 'b');
-    REQUIRE(new_s->get_col() == 2);
-    REQUIRE(new_s->get_line() == 1);
+    REQUIRE(new_s.get_col() == 2);
+    REQUIRE(new_s.get_line() == 1);
   }
 
   SECTION("eat till the next line") {
     auto new_s = s.eat(5);
-    auto [v, st] = new_s->uncons().value();
-    REQUIRE(new_s->get_line() == 2);
-    REQUIRE(new_s->get_col() == 2);
+    auto [v, st] = new_s.uncons().value();
+    REQUIRE(new_s.get_line() == 2);
+    REQUIRE(new_s.get_col() == 2);
     REQUIRE(v == 'e');
   }
 
@@ -41,14 +41,14 @@ TEST_CASE("Create StirngState", "StringState") {
   }
 
   SECTION("const expr test") {
-    constexpr StringState s1("abc\ndef\nghi\n");
+    StringState s1("abc\ndef\nghi\n");
     auto [v, st] = s1.uncons().value();
     REQUIRE(v == 'a');
   }
 
   SECTION("next_position") {
     using cppparsec::Position;
-    constexpr StringState s1("abc\ndef\nghi\n");
+    StringState s1("abc\ndef\nghi\n");
     Position pos = s1.next_position();
 
     REQUIRE(pos.line == 1);
@@ -62,37 +62,37 @@ TEST_CASE("Create StirngState", "StringState") {
 
   SECTION("eat until position") {
     using cppparsec::Position;
-    constexpr StringState s1("abc\ndef\nghi\n");
+    StringState s1("abc\ndef\nghi\n");
     // hand calculate the arbitrary position.
     // this should never be done in real code.
     Position pos{3, 2, 3 + 1 + 3 + 1 + 2 - 1};
     auto s2 = s1.eat(pos);
 
-    REQUIRE(s2->get_position().line == 3);
-    REQUIRE(s2->get_position().col == 2);
-    REQUIRE(s2->get_position().index == 9);
+    REQUIRE(s2.get_position().line == 3);
+    REQUIRE(s2.get_position().col == 2);
+    REQUIRE(s2.get_position().index == 9);
   }
 
   SECTION("next position with eat") {
     using cppparsec::Position;
-    constexpr StringState s1("abc\ndef\nghi\n");
+    StringState s1("abc\ndef\nghi\n");
     Position pos = s1.next_position(4);
     auto s2 = s1.eat(pos);
 
-    REQUIRE(s2->get_position().line == 2);
-    REQUIRE(s2->get_position().col == 1);
-    REQUIRE(s2->get_position().index == 4);
+    REQUIRE(s2.get_position().line == 2);
+    REQUIRE(s2.get_position().col == 1);
+    REQUIRE(s2.get_position().index == 4);
   }
 
   SECTION("next position is the same as currenet position") {
     using cppparsec::Position;
-    constexpr StringState s1("abc\ndef\nghi\n");
+    StringState s1("abc\ndef\nghi\n");
     Position pos = s1.next_position(0);
     auto s2 = s1.eat(pos);
 
-    REQUIRE(s2->get_position().line == s1.get_position().line);
-    REQUIRE(s2->get_position().col == s1.get_position().col);
-    REQUIRE(s2->get_position().index == s1.get_position().index);
+    REQUIRE(s2.get_position().line == s1.get_position().line);
+    REQUIRE(s2.get_position().col == s1.get_position().col);
+    REQUIRE(s2.get_position().index == s1.get_position().index);
   }
 }
 
@@ -290,7 +290,6 @@ TEST_CASE("apply") {
 TEST_CASE("token") {
   using namespace cppparsec;
   using namespace cppparsec::stream;
-  using PChar = Parser<StringState, char>;
   StringState s("abc\ndef\nghi\n");
 
   auto printer = [](char v) { return std::string(1, v); };
@@ -305,9 +304,9 @@ TEST_CASE("token") {
 
   SECTION("token 2") {
     auto p1 = token<StringState, char>(printer, match);
-    auto p2 = p1 >> p1 >> p1 >> p1;
+    auto p2 = p1 >> p1 >> p1 >> p1 >> p1;
     auto r = p2(s);
-    std::cout << r.value.value() << std::endl;
+    std::cout << "value is: " << r.value.value() << std::endl;
   }
 }
 

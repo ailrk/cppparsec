@@ -274,7 +274,7 @@ Parser<S, U> Parser<S, T>::map(const Fn &fn) {
 
   return Parser<S, U>(
 
-      [fn, p = unparser](const S &state, const Conts<S, U> &cont) {
+      [fn, p = unparser](S state, Conts<S, U> cont) {
         // map on continuation.
         auto mapped_ok = [&cont, &fn](Reply<S, T> reply) -> bool {
           return cont.consumed_ok(reply.map(fn));
@@ -325,7 +325,7 @@ Parser<S, U> Parser<S, T>::bind(Fm fm) {
       Parser<S, U> m = fm(reply.value.value());
       return (*m.unparser)(
 
-          state,
+          reply.state,
 
           {.consumed_ok = consumed_ok,
            .consumed_err = consumed_err,
@@ -354,7 +354,7 @@ Parser<S, U> Parser<S, T>::bind(Fm fm) {
       Parser<S, U> m = fm(reply.value.value());
       return (*m.unparser)(
 
-          state,
+          reply.state,
 
           {.consumed_ok = consumed_ok,
            .consumed_err = consumed_err,
@@ -644,9 +644,7 @@ Parser<S, T> token(PrettyPrint pretty_print, Match match) {
     if (match(v)) {
 
       // valid token, construct a new reply with the token as it's value.
-      Position newpos = state.next_position();
-
-      state = state.eat(newpos);
+      state = std::move(state.eat(state.next_position()));
 
       Reply<S, T> reply =
           Reply<S, T>::mk_consumed_ok_reply({v}, state, unknown_error(state));

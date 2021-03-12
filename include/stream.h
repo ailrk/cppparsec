@@ -128,20 +128,20 @@ public:
       : data(stream.data),
         position(std::make_unique<Position>(*stream.position)) {}
 
-  constexpr StringState &operator=(const StringState &stream) {
+  StringState &operator=(const StringState &stream) {
     data = stream.data;
     position = std::make_unique<Position>(*stream.position);
     return *this;
   }
 
-  constexpr bool is_empty() const;
-  constexpr size_t get_line() const;
-  constexpr size_t get_col() const;
-  constexpr Position get_position() const;
-  constexpr Position next_position() const;
-  constexpr Position next_position(size_t) const;
+  bool is_empty() const;
+  size_t get_line() const;
+  size_t get_col() const;
+  Position get_position() const;
+  Position next_position() const;
+  Position next_position(size_t) const;
 
-  constexpr std::optional<std::tuple<ValueType, StreamType>> uncons() const;
+  std::optional<std::tuple<ValueType, StreamType>> uncons() const;
 
   StringState eat(const Position &) const;
   StringState eat(size_t n) const;
@@ -152,17 +152,17 @@ static_assert(sizeof(StringState) == 24,
               "StringState is too large. It should only contain a string_view "
               "and an unique_ptr to the position");
 
-constexpr bool StringState::is_empty() const { return data.size() == 0; }
+bool StringState::is_empty() const { return data.size() == 0; }
 
-constexpr size_t StringState::get_line() const { return position->line; };
+size_t StringState::get_line() const { return position->line; };
 
-constexpr size_t StringState::get_col() const { return position->col; };
+size_t StringState::get_col() const { return position->col; };
 
-constexpr Position StringState::get_position() const { return *position; }
+Position StringState::get_position() const { return *position; }
 
 // the next position after taken n elements.
 // when n =  0 return the same position;
-constexpr Position StringState::next_position(size_t n) const {
+Position StringState::next_position(size_t n) const {
   if (is_empty() && n == 0) {
     return *position;
   }
@@ -181,12 +181,12 @@ constexpr Position StringState::next_position(size_t n) const {
   return new_position;
 }
 
-constexpr Position StringState::next_position() const {
+Position StringState::next_position() const {
   return next_position(1);
 }
 
 // Return the first element and the rest stream.
-constexpr std::optional<std::tuple<char, std::string_view>>
+std::optional<std::tuple<char, std::string_view>>
 StringState::uncons() const {
   if (is_empty()) {
     return {};
