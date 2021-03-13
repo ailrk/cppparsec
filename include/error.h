@@ -9,34 +9,34 @@
 
 namespace cppparsec {
 
-enum class Error { SysUnExpect, UnExpect, Expect, Message };
+enum class error_t { SysUnExpect, UnExpect, Expect, Message };
 
-struct Message {
-  Error error_kind;
+struct message_t {
+  error_t error_kind;
   std::string text;
 
   const std::string &to_string() const { return text; }
 
-  Message() : error_kind(Error::SysUnExpect), text() {}
-  Message(Error error_kind, std::string text)
+  message_t() : error_kind(error_t::SysUnExpect), text() {}
+  message_t(error_t error_kind, std::string text)
       : error_kind(error_kind), text(text) {}
 
-  friend bool operator==(const Message &m1, const Message &m2) {
+  friend bool operator==(const message_t &m1, const message_t &m2) {
     return m1.error_kind == m2.error_kind && m1.text == m2.text;
   }
 };
 
-class ParseError {
+class parser_error {
 public:
 private:
-  using Messages = std::vector<Message>;
+  using Messages = std::vector<message_t>;
 
-  Position position;
+  src_position position;
   Messages messages;
 
 public:
-  ParseError() : position(Position{1, 1, 0}), messages() {}
-  ParseError(const Position &position, const Messages &messages)
+  parser_error() : position(src_position{1, 1, 0}), messages() {}
+  parser_error(const src_position &position, const Messages &messages)
       : position(position), messages(messages) {}
 
   // if the messages is empty
@@ -44,7 +44,8 @@ public:
   bool is_unkown_error() { return empty(); }
 
   // merge errors to get a new error.
-  friend ParseError operator+(const ParseError &e1, const ParseError &e2) {
+  friend parser_error operator+(const parser_error &e1,
+                                const parser_error &e2) {
     if (!e1.messages.empty() && e2.messages.empty()) {
       return e2;
     } else if (e1.messages.empty() && !e2.messages.empty()) {
@@ -56,7 +57,7 @@ public:
       msg.insert(msg.end(), e1.messages.begin(), e1.messages.end());
       msg.insert(msg.end(), e2.messages.begin(), e2.messages.end());
 
-      return ParseError{e1.position, msg};
+      return parser_error{e1.position, msg};
     } else if (e1.position > e2.position) {
       return e1;
     } else {
@@ -64,10 +65,10 @@ public:
     }
   }
 
-  void set_position(Position pos) { position = pos; }
-  Position get_position() const { return position; }
+  void set_position(src_position pos) { position = pos; }
+  src_position get_position() const { return position; }
 
-  void add_message(Message message) {
+  void add_message(message_t message) {
     // messages.erase(std::remove(messages.begin(), messages.end(), message));
     messages.erase(std::remove(messages.begin(), messages.end(), message));
 
@@ -90,28 +91,29 @@ public:
   }
 };
 
-ParseError message_error(Position position, const std::string &message) {
-  auto m = Message(Error::Message, message);
-  return ParseError(position, {m});
+parser_error message_error(src_position position, const std::string &message) {
+  auto m = message_t(error_t::Message, message);
+  return parser_error(position, {m});
 }
 
-ParseError unexpect_error(Position position, const std::string &message) {
-  auto m = Message(Error::UnExpect, message);
-  return ParseError(position, {m});
+parser_error unexpect_error(src_position position, const std::string &message) {
+  auto m = message_t(error_t::UnExpect, message);
+  return parser_error(position, {m});
 }
 
-ParseError expect_error(Position position, const std::string &message) {
-  auto m = Message(Error::Expect, message);
-  return ParseError(position, {m});
+parser_error expect_error(src_position position, const std::string &message) {
+  auto m = message_t(error_t::Expect, message);
+  return parser_error(position, {m});
 }
 
-ParseError sys_unexpect_error(Position position, const std::string &message) {
-  auto m = Message(Error::SysUnExpect, message);
-  return ParseError(position, {m});
+parser_error sys_unexpect_error(src_position position,
+                                const std::string &message) {
+  auto m = message_t(error_t::SysUnExpect, message);
+  return parser_error(position, {m});
 }
 
-template <stream::state_type S> ParseError unknown_error(S state) {
-  return ParseError(state.get_position(), {});
+template <stream::state_type S> parser_error unknown_error(S state) {
+  return parser_error(state.get_position(), {});
 }
 
 // throw when many is used with a parser that accepts an emtpy string.

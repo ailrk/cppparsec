@@ -5,7 +5,7 @@
 
 namespace cppparsec {
 
-template <stream::state_type S> struct LanguageDefS {
+template <stream::state_type S> struct language_def_s {
 
   std::string comment_start;
 
@@ -15,13 +15,13 @@ template <stream::state_type S> struct LanguageDefS {
 
   bool nested_comments;
 
-  Parser<S, char> ident_start;
+  parser<S, char> ident_start;
 
-  Parser<S, char> ident_letter;
+  parser<S, char> ident_letter;
 
-  Parser<S, char> op_start;
+  parser<S, char> op_start;
 
-  Parser<S, char> op_letter;
+  parser<S, char> op_letter;
 
   std::vector<std::string> reserved_names;
 
@@ -30,57 +30,57 @@ template <stream::state_type S> struct LanguageDefS {
   bool case_sensitive;
 };
 
-using LanguageDef = LanguageDefS<stream::StringState>;
+using language_def = language_def_s<stream::StringState>;
 
 template <stream::state_type S> struct TokenParserS {
-  Parser<S, std::string> identifier;
+  parser<S, std::string> identifier;
 
-  Parser<S, std::monostate> reserved;
+  parser<S, std::monostate> reserved;
 
-  Parser<S, std::string> op;
+  parser<S, std::string> op;
 
-  Parser<S, std::monostate> reserved_op;
+  parser<S, std::monostate> reserved_op;
 
-  Parser<S, char> char_literal;
+  parser<S, char> char_literal;
 
-  Parser<S, std::string> string_literal;
+  parser<S, std::string> string_literal;
 
-  Parser<S, size_t> natural;
+  parser<S, size_t> natural;
 
-  Parser<S, int> integer;
+  parser<S, int> integer;
 
-  Parser<S, double> floating;
+  parser<S, double> floating;
 
-  Parser<S, std::variant<int, double>> int_or_floating;
+  parser<S, std::variant<int, double>> int_or_floating;
 
-  Parser<S, int> decimal;
+  parser<S, int> decimal;
 
-  Parser<S, int> hexdecimal;
+  parser<S, int> hexdecimal;
 
-  Parser<S, int> octal;
+  parser<S, int> octal;
 
-  Parser<S, std::string> symbol;
+  parser<S, std::string> symbol;
 
   // TODO how to do higher ranked type?
   // template <typename T> std::function<Parser<S, T>(Parser<S, T>)> lexeme;
 
-  Parser<S, std::monostate> white_space;
+  parser<S, std::monostate> white_space;
 
-  Parser<S, std::string> semi;
+  parser<S, std::string> semi;
 
-  Parser<S, std::string> comma;
+  parser<S, std::string> comma;
 
-  Parser<S, std::string> colon;
+  parser<S, std::string> colon;
 
-  Parser<S, std::string> dot;
+  parser<S, std::string> dot;
 
-  Parser<S, std::string> semi_sep;
+  parser<S, std::string> semi_sep;
 
-  Parser<S, std::string> semi_sep1;
+  parser<S, std::string> semi_sep1;
 
-  Parser<S, std::string> comma_sep;
+  parser<S, std::string> comma_sep;
 
-  Parser<S, std::string> comma_seq1;
+  parser<S, std::string> comma_seq1;
 };
 
 } // namespace cppparsec

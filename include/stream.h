@@ -13,7 +13,7 @@ namespace cppparsec {
 // Position can't change itself. it can only be updated by String.
 // the reason is Position doesn't have information about what character
 // it's rading, so it doesn't know if it need to increment col or line.
-struct Position {
+struct src_position {
   size_t line;
   size_t col;
   size_t index; // the index in a container. e.g the index in a string.
@@ -29,30 +29,30 @@ struct Position {
     return res;
   }
 
-  friend int operator-(const Position &p1, const Position &p2) {
+  friend int operator-(const src_position &p1, const src_position &p2) {
     return p1.index - p2.index;
   }
 
-  [[nodiscard]] friend bool operator<(const Position &p1, const Position &p2) {
+  [[nodiscard]] friend bool operator<(const src_position &p1, const src_position &p2) {
     return p1.index < p2.index;
   }
 
-  [[nodiscard]] friend bool operator>(const Position &p1, const Position &p2) {
+  [[nodiscard]] friend bool operator>(const src_position &p1, const src_position &p2) {
     return p1.index > p2.index;
   }
 
-  [[nodiscard]] friend bool operator==(const Position &p1, const Position &p2) {
+  [[nodiscard]] friend bool operator==(const src_position &p1, const src_position &p2) {
     return p1.index == p2.index;
   }
 
-  [[nodiscard]] friend bool operator!=(const Position &p1, const Position &p2) {
+  [[nodiscard]] friend bool operator!=(const src_position &p1, const src_position &p2) {
     return !(p1 == p2);
   }
 };
 
-constexpr inline Position default_init_position() { return Position{1, 1, 0}; }
+constexpr inline src_position default_init_position() { return src_position{1, 1, 0}; }
 
-static_assert(std::is_trivial_v<Position>, "`Position` should be trivial");
+static_assert(std::is_trivial_v<src_position>, "`Position` should be trivial");
 
 } // namespace cppparsec
 
@@ -81,7 +81,7 @@ template <typename T> concept state_type = requires(T t) {
               typename T::StreamType>>>;
 
   { t.get_position() }
-  ->std::same_as<Position>;
+  ->std::same_as<src_position>;
 
   // TODO might also want to constrain overloads.
   // .1 eat(size_t n),
@@ -93,17 +93,17 @@ template <typename T> concept state_type = requires(T t) {
 
   // calculate the next position of the token.
   { t.next_position() }
-  ->std::same_as<Position>;
+  ->std::same_as<src_position>;
 
   { t.is_empty() }
   ->std::same_as<bool>;
 };
 
 // Stream type for string_view.
-class StringState {
+class string_state {
 
   std::string_view data;
-  std::unique_ptr<Position> position;
+  std::unique_ptr<src_position> position;
 
 public:
   // update stream, return a new String Stream.
@@ -111,63 +111,63 @@ public:
   using StreamType = std::string_view;
   using ValueType = char;
 
-  StringState(const std::string_view &s, const Position &pos)
-      : data(s), position(std::make_unique<Position>(pos)) {}
+  string_state(const std::string_view &s, const src_position &pos)
+      : data(s), position(std::make_unique<src_position>(pos)) {}
 
-  StringState(std::string_view s)
-      : data(s), position(std::make_unique<Position>(default_init_position())) {
+  string_state(std::string_view s)
+      : data(s), position(std::make_unique<src_position>(default_init_position())) {
   }
 
-  StringState()
+  string_state()
       : data(""),
-        position(std::make_unique<Position>(default_init_position())) {}
+        position(std::make_unique<src_position>(default_init_position())) {}
 
   // copy the string stream with the same state.
   // Thisis essential for retrying.
-  StringState(const StringState &stream)
+  string_state(const string_state &stream)
       : data(stream.data),
-        position(std::make_unique<Position>(*stream.position)) {}
+        position(std::make_unique<src_position>(*stream.position)) {}
 
-  StringState &operator=(const StringState &stream) {
+  string_state &operator=(const string_state &stream) {
     data = stream.data;
-    position = std::make_unique<Position>(*stream.position);
+    position = std::make_unique<src_position>(*stream.position);
     return *this;
   }
 
   bool is_empty() const;
   size_t get_line() const;
   size_t get_col() const;
-  Position get_position() const;
-  Position next_position() const;
-  Position next_position(size_t) const;
+  src_position get_position() const;
+  src_position next_position() const;
+  src_position next_position(size_t) const;
 
   std::optional<std::tuple<ValueType, StreamType>> uncons() const;
 
-  StringState eat(const Position &) const;
-  StringState eat(size_t n) const;
-  StringState eat() const;
+  string_state eat(const src_position &) const;
+  string_state eat(size_t n) const;
+  string_state eat() const;
 };
 
-static_assert(sizeof(StringState) == 24,
+static_assert(sizeof(string_state) == 24,
               "StringState is too large. It should only contain a string_view "
               "and an unique_ptr to the position");
 
-bool StringState::is_empty() const { return data.size() == 0; }
+bool string_state::is_empty() const { return data.size() == 0; }
 
-size_t StringState::get_line() const { return position->line; }
+size_t string_state::get_line() const { return position->line; }
 
-size_t StringState::get_col() const { return position->col; }
+size_t string_state::get_col() const { return position->col; }
 
-Position StringState::get_position() const { return *position; }
+src_position string_state::get_position() const { return *position; }
 
 // the next position after taken n elements.
 // when n =  0 return the same position;
-Position StringState::next_position(size_t n) const {
+src_position string_state::next_position(size_t n) const {
   if (is_empty() && n == 0) {
     return *position;
   }
 
-  Position new_position = *position;
+  src_position new_position = *position;
 
   for (size_t i = 0; i < n; ++i) {
     if (data[i] == '\n') {
@@ -181,10 +181,10 @@ Position StringState::next_position(size_t n) const {
   return new_position;
 }
 
-Position StringState::next_position() const { return next_position(1); }
+src_position string_state::next_position() const { return next_position(1); }
 
 // Return the first element and the rest stream.
-std::optional<std::tuple<char, std::string_view>> StringState::uncons() const {
+std::optional<std::tuple<char, std::string_view>> string_state::uncons() const {
   if (is_empty()) {
     return {};
   }
@@ -193,19 +193,19 @@ std::optional<std::tuple<char, std::string_view>> StringState::uncons() const {
 
 // Eat the next n tokens, and return a new StringStream with
 // updated position.
-StringState StringState::eat(size_t n) const {
+string_state string_state::eat(size_t n) const {
   if (n == 0) {
     return *this;
   } else {
-    return StringState(data.substr(n), next_position(n));
+    return string_state(data.substr(n), next_position(n));
   }
 }
 
 // given a new position, eat until the current position is the same as the
 // new position.
-StringState StringState::eat(const Position &target_position) const {
+string_state string_state::eat(const src_position &target_position) const {
   // accumulator
-  StringState res = StringState(*this);
+  string_state res = string_state(*this);
 
   if (*position > target_position) {
     return res;
@@ -216,5 +216,5 @@ StringState StringState::eat(const Position &target_position) const {
   return res.eat(distance);
 }
 
-StringState StringState::eat() const { return eat(1); }
+string_state string_state::eat() const { return eat(1); }
 } // namespace cppparsec::stream
