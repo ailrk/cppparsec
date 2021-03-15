@@ -30,7 +30,7 @@ template <stream::state_type S> struct language_def_s {
   bool case_sensitive;
 };
 
-using language_def = language_def_s<stream::StringState>;
+using language_def = language_def_s<stream::string_state>;
 
 template <stream::state_type S> struct TokenParserS {
   parser<S, std::string> identifier;
