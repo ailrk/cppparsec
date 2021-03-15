@@ -33,24 +33,30 @@ struct src_position {
     return p1.index - p2.index;
   }
 
-  [[nodiscard]] friend bool operator<(const src_position &p1, const src_position &p2) {
+  [[nodiscard]] friend bool operator<(const src_position &p1,
+                                      const src_position &p2) {
     return p1.index < p2.index;
   }
 
-  [[nodiscard]] friend bool operator>(const src_position &p1, const src_position &p2) {
+  [[nodiscard]] friend bool operator>(const src_position &p1,
+                                      const src_position &p2) {
     return p1.index > p2.index;
   }
 
-  [[nodiscard]] friend bool operator==(const src_position &p1, const src_position &p2) {
+  [[nodiscard]] friend bool operator==(const src_position &p1,
+                                       const src_position &p2) {
     return p1.index == p2.index;
   }
 
-  [[nodiscard]] friend bool operator!=(const src_position &p1, const src_position &p2) {
+  [[nodiscard]] friend bool operator!=(const src_position &p1,
+                                       const src_position &p2) {
     return !(p1 == p2);
   }
 };
 
-constexpr inline src_position default_init_position() { return src_position{1, 1, 0}; }
+constexpr inline src_position default_init_position() {
+  return src_position{1, 1, 0};
+}
 
 static_assert(std::is_trivial_v<src_position>, "`Position` should be trivial");
 
@@ -115,8 +121,8 @@ public:
       : data(s), position(std::make_unique<src_position>(pos)) {}
 
   string_state(std::string_view s)
-      : data(s), position(std::make_unique<src_position>(default_init_position())) {
-  }
+      : data(s),
+        position(std::make_unique<src_position>(default_init_position())) {}
 
   string_state()
       : data(""),

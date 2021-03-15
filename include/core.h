@@ -248,19 +248,21 @@ reply<S, T> parser<S, T>::operator()(const S &state) {
 
       state,
 
-      {.consumed_ok = ok,
+      {
 
-       .consumed_err = [&r, &state](parser_error err) -> bool {
-         r = reply<S, T>::mk_consumed_err_reply(state, err);
-         return r.ok;
-       },
+          .consumed_ok = ok,
 
-       .empty_ok = ok,
+          .consumed_err = [&r, &state](parser_error err) -> bool {
+            r = reply<S, T>::mk_consumed_err_reply(state, err);
+            return r.ok;
+          },
 
-       .empty_err = [&r, &state](parser_error err) -> bool {
-         r = reply<S, T>::mk_empty_err_reply(state, err);
-         return r.ok;
-       }
+          .empty_ok = ok,
+
+          .empty_err = [&r, &state](parser_error err) -> bool {
+            r = reply<S, T>::mk_empty_err_reply(state, err);
+            return r.ok;
+          }
 
       });
   return r;
@@ -286,10 +288,12 @@ parser<S, U> parser<S, T>::map(const Fn &fn) {
             state,
 
             // only need to map continuations that carry values.
-            {.consumed_ok = mapped_ok,
-             .consumed_err = cont.consumed_err,
-             .empty_ok = mapped_ok,
-             .empty_err = cont.empty_err
+            {
+
+                .consumed_ok = mapped_ok,
+                .consumed_err = cont.consumed_err,
+                .empty_ok = mapped_ok,
+                .empty_err = cont.empty_err
 
             });
       });
@@ -328,10 +332,12 @@ parser<S, U> parser<S, T>::bind(Fm fm) {
 
           rep.state,
 
-          {.consumed_ok = consumed_ok,
-           .consumed_err = consumed_err,
-           .empty_ok = pempty_ok,
-           .empty_err = pempty_err
+          {
+
+              .consumed_ok = consumed_ok,
+              .consumed_err = consumed_err,
+              .empty_ok = pempty_ok,
+              .empty_err = pempty_err
 
           });
     };
@@ -357,20 +363,26 @@ parser<S, U> parser<S, T>::bind(Fm fm) {
 
           rep.state,
 
-          {.consumed_ok = consumed_ok,
-           .consumed_err = consumed_err,
-           .empty_ok = pempty_ok,
-           .empty_err = pempty_err
+          {
+
+              .consumed_ok = consumed_ok,
+              .consumed_err = consumed_err,
+              .empty_ok = pempty_ok,
+              .empty_err = pempty_err
 
           });
     };
 
     return (*p)(state,
 
-                {.consumed_ok = consumer_ok,
-                 .consumed_err = cont.consumed_err,
-                 .empty_ok = empty_ok,
-                 .empty_err = cont.empty_err});
+                {
+
+                    .consumed_ok = consumer_ok,
+                    .consumed_err = cont.consumed_err,
+                    .empty_ok = empty_ok,
+                    .empty_err = cont.empty_err
+
+                });
   });
 }
 
@@ -424,10 +436,12 @@ parser<S, T> parser<S, T>::alt(parser<S, T> n) {
 
           state,
 
-          {.consumed_ok = cont.consumed_ok,
-           .consumed_err = cont.consumed_err,
-           .empty_ok = nempty_ok,
-           .empty_err = nempty_err
+          {
+
+              .consumed_ok = cont.consumed_ok,
+              .consumed_err = cont.consumed_err,
+              .empty_ok = nempty_ok,
+              .empty_err = nempty_err
 
           });
     };
@@ -436,10 +450,12 @@ parser<S, T> parser<S, T>::alt(parser<S, T> n) {
 
         state,
 
-        {.consumed_ok = cont.consumed_ok,
-         .consumed_err = cont.consumed_err,
-         .empty_ok = cont.empty_ok,
-         .empty_err = mempty_err
+        {
+
+            .consumed_ok = cont.consumed_ok,
+            .consumed_err = cont.consumed_err,
+            .empty_ok = cont.empty_ok,
+            .empty_err = mempty_err
 
         });
   });
@@ -482,10 +498,12 @@ parser<S, T> attempt(parser<S, T> p) {
 
         state,
 
-        {.consumed_ok = cont.consumed_ok,
-         .consumed_err = cont.empty_err,
-         .empty_ok = cont.empty_ok,
-         .empty_err = cont.empty_err
+        {
+
+            .consumed_ok = cont.consumed_ok,
+            .consumed_err = cont.empty_err,
+            .empty_ok = cont.empty_ok,
+            .empty_err = cont.empty_err
 
         });
   });
@@ -508,10 +526,12 @@ parser<S, T> look_ahead(parser<S, T> p) {
 
         state,
 
-        {.consumed_ok = empty_ok1,
-         .consumed_err = cont.consumed_err,
-         .empty_ok = empty_ok1,
-         .empty_err = cont.empty_err
+        {
+
+            .consumed_ok = empty_ok1,
+            .consumed_err = cont.consumed_err,
+            .empty_ok = empty_ok1,
+            .empty_err = cont.empty_err
 
         });
   });
@@ -536,29 +556,31 @@ parser<S, std::vector<T>> many_accum(AccumFn fn, parser<S, T> p) {
 
           rep.state,
 
-          {.consumed_ok = [&walk, &fn, acc](reply<S, T> rep) -> bool {
-             auto v = rep.value.value();
-             walk(fn(v, acc), rep);
-             return rep.ok;
-           },
+          {
 
-           .consumed_err = cont.consumed_err,
+              .consumed_ok = [&walk, &fn, acc](reply<S, T> rep) -> bool {
+                auto v = rep.value.value();
+                walk(fn(v, acc), rep);
+                return rep.ok;
+              },
 
-           // this case should never happen.
-           // You can't have a parser accepts empty string keeps running.
-           .empty_ok =
-               [](reply<S, T> rep) {
-                 throw bad_many_combinator();
-                 return rep.ok;
-               },
+              .consumed_err = cont.consumed_err,
 
-           .empty_err = [=]([[maybe_unused]] parser_error error) -> bool {
-             reply<S, std::vector<T>> rep1;
-             rep1 = reply<S, std::vector<T>>::mk_consumed_ok_reply(
-                 acc, rep.state, rep.error);
+              // this case should never happen.
+              // You can't have a parser accepts empty string keeps running.
+              .empty_ok =
+                  [](reply<S, T> rep) {
+                    throw bad_many_combinator();
+                    return rep.ok;
+                  },
 
-             return cont.consumed_ok(rep1);
-           }
+              .empty_err = [=]([[maybe_unused]] parser_error error) -> bool {
+                reply<S, std::vector<T>> rep1;
+                rep1 = reply<S, std::vector<T>>::mk_consumed_ok_reply(
+                    acc, rep.state, rep.error);
+
+                return cont.consumed_ok(rep1);
+              }
 
           });
     };
@@ -567,24 +589,26 @@ parser<S, std::vector<T>> many_accum(AccumFn fn, parser<S, T> p) {
 
         state,
 
-        {.consumed_ok = [&walk](reply<S, T> rep) -> bool {
-           auto v = rep.value.value();
-           walk({v}, rep);
-           return rep.ok;
-         },
+        {
 
-         .consumed_err = cont.consumed_err,
+            .consumed_ok = [&walk](reply<S, T> rep) -> bool {
+              auto v = rep.value.value();
+              walk({v}, rep);
+              return rep.ok;
+            },
 
-         .empty_ok = [](reply<S, T> rep) -> bool {
-           throw bad_many_combinator();
-           return rep.ok;
-         },
+            .consumed_err = cont.consumed_err,
 
-         .empty_err = [&cont, state](parser_error error) -> bool {
-           auto rep =
-               reply<S, std::vector<T>>::mk_empty_ok_reply({{}}, state, error);
-           return cont.empty_ok(rep);
-         }
+            .empty_ok = [](reply<S, T> rep) -> bool {
+              throw bad_many_combinator();
+              return rep.ok;
+            },
+
+            .empty_err = [&cont, state](parser_error error) -> bool {
+              auto rep = reply<S, std::vector<T>>::mk_empty_ok_reply(
+                  {{}}, state, error);
+              return cont.empty_ok(rep);
+            }
 
         });
   });
@@ -710,10 +734,12 @@ parser<S, T> labels(parser<S, T> p, const std::vector<std::string> &msgs) {
 
         state,
 
-        {.consumed_ok = cont.consumed_ok,
-         .consumed_err = cont.consumed_err,
-         .empty_ok = empty_ok,
-         .empty_err = empty_err
+        {
+
+            .consumed_ok = cont.consumed_ok,
+            .consumed_err = cont.consumed_err,
+            .empty_ok = empty_ok,
+            .empty_err = empty_err
 
         });
   });
