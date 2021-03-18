@@ -132,11 +132,11 @@ public:
   // Thisis essential for retrying.
   string_state(const string_state &stream)
       : data(stream.data),
-        position(std::make_unique<src_position>(*stream.position)) {}
+        position(std::make_unique<src_position>(stream.get_position())) {}
 
   string_state &operator=(const string_state &stream) {
     data = stream.data;
-    position = std::make_unique<src_position>(*stream.position);
+    position = std::make_unique<src_position>(stream.get_position());
     return *this;
   }
 

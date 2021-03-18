@@ -159,13 +159,6 @@ public:
   // should never need to interact with them direclty.
   std::shared_ptr<ParserFn<S, T>> unparser;
 
-  parser() = default;
-
-  parser(const parser<S, T> &) = default;
-  parser(parser<S, T> &&parser) = default;
-  parser &operator=(const parser<S, T> &) = default;
-  parser &operator=(parser<S, T> &&parser) = default;
-
   parser(const ParserFn<S, T> &parse)
       : unparser(std::make_shared<ParserFn<S, T>>(parse)) {}
 
