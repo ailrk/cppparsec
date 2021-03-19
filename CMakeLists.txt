@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(cppparsec VERSION 1.0)
+project(cppparsec VERSION 1.0
+                  DESCRIPTION "a monadic parser combinator libary"
+                  LANGUAGES CXX)
 
 set(FUZZER OFF CACHE BOOL "Fuzzer")
 

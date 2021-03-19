@@ -11,7 +11,6 @@ TEST_CASE("character parser") {
   SECTION("char sequence") {
     auto p = ch('a') >> ch('b') >> ch('c');
     auto r = p(s);
-
     std::cout << r.value.value() << std::endl;
   }
 }
