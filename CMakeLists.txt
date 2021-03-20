@@ -13,25 +13,21 @@ option(CPPPARSEC_BUILD_TEST "Build unit tests")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# header only lib
+include(CMakePackageConfigHelpers)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
-if ("${CMAKE_CXX_FLAGS}" MATCHES ".*-fno-rtti.*")
-  message("cppparsec: rtti is disabled")
+add_library(cppparsec INTERFACE)
+add_library(cppparsec::cppparsec ALIAS cppparsec)
+target_include_directories(cppparsec INTERFACE
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>)
+
+if (CPPPARSEC_BUILD_FUZZER AND CPPPARSEC_BUILD_TEST)
+  message(FATAL_ERROR
+    "Can't build fuzzer and test together. Please choose one.")
 endif()
 
-# debug flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
-
-if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-  set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
-endif()
-
-# add test targets
+# test targets
 if(CPPPARSEC_BUILD_FUZZER)
   message("cppparsec: Building fuzz tests")
   add_subdirectory(fuzzer)

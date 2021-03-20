@@ -77,9 +77,10 @@ inline parser<S, T> between(Open o, Close c, P p) {
   using Ot_ = typename parser_trait<Open>::type;
   using Ct_ = typename parser_trait<Close>::type;
 
-  return o >>= [=](Ot_ _1) {
+  return o >>= [=]([[maybe_unused]] Ot_ _1) {
     return p >>= [=](T v) {
-      return c >>= [=](Ct_ _2) { return parser<S, T>::pure(v); };
+      return c >>=
+             [=]([[maybe_unused]] Ct_ _2) { return parser<S, T>::pure(v); };
     };
   };
 }
@@ -98,12 +99,12 @@ inline parser<S, std::optional<T>> option(parser<S, T> p) {
 }
 
 template <stream::state_type S, typename T, typename End>
-parser<S, std::vector<T>> any_token(parser<S, T> p) {}
+parser<S, std::vector<T>> any_token(parser<S, T> p);
 
 // skip at least 1 and return nothing.
 template <stream::state_type S, typename T>
 parser<S, std::monostate> skip_many1(parser<S, T> p) {
-  return p >>= [=](T _) { return skip_many(p); };
+  return p >>= [=]([[maybe_unused]] T _) { return skip_many(p); };
 }
 
 // parse `p` 1 or more times.
@@ -149,7 +150,8 @@ parser<S, std::vector<T>> sepend_by(parser<S, T> p, parser<S, SepEnd> sepend);
 template <stream::state_type S, typename T, typename SepEnd>
 parser<S, std::vector<T>> sepend_by1(parser<S, T> p, parser<S, SepEnd> sepend) {
   return (p >>= [=](T v) {
-    return sepend >>= [=](typename parser_trait<SepEnd>::type _1) {
+    return sepend >>= [=]([[maybe_unused]]
+                          typename parser_trait<SepEnd>::type _1) {
       return sepend_by(p, sepend) >>=
              [=](std::vector<T> vs) { vs.insert(vs.begin(), 1, v); };
     } | parser<S, std::vector<T>>::pure(v);
@@ -168,7 +170,7 @@ template <typename P, typename End,
           typename S = typename parser_trait<P>::stream_t,
           typename T = typename parser_trait<P>::type>
 
-parser<S, std::vector<T>> end_by(P p, End end) {}
+parser<S, std::vector<T>> end_by(P p, End end);
 
 // parser `p` 1 or more times ended by end
 template <stream::state_type S, typename T, typename End>

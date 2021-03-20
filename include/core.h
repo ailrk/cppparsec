@@ -464,7 +464,7 @@ parser<S, T> operator|(parser<S, T> p, parser<S, T> q) {
 
 template <stream::state_type S, typename T>
 parser<S, T> operator*(parser<S, T> p, parser<S, T> q) {
-  return p >>= [=](T _) { return q; };
+  return p >>= [=]([[maybe_unused]] T _) { return q; };
 }
 
 } // namespace cppparsec
