@@ -1,5 +1,8 @@
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
+set(EXECUTABLE_OUTPUT_PATH "${PROJECT_BINARY_DIR}/bin")
+
 # include header
-include_directories(${cppparsec_SOURCE_DIR}/include)
+include_directories(${cppparsec_SOURCE_DIR}/cppparsec)
 link_directories(${cppparsec_BINARY_DIR}/lib)
 
 # include catch2
