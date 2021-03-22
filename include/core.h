@@ -11,6 +11,8 @@
 #include <variant>
 #include <vector>
 
+#include <csignal>
+
 namespace cppparsec {
 // The program is cps transformed, so it might take a little bit
 // dicipher works to read.
@@ -38,13 +40,16 @@ public:
 
   parser_error error;
 
-  reply() : consumed(false), ok(false), value(), state(), error() {}
+  reply() : consumed(false), ok(false), value(std::nullopt), state(), error() {
+    std::cout << "reply" << std::endl;
+  }
 
   // NOTE: You should never call this direclty.
   reply(bool consumed, bool ok, std::optional<T> value, S state,
         parser_error error)
       : consumed(consumed), ok(ok), value(value), state(state), error(error) {
 
+    std::cout << "position: " << state.get_position().to_string() << std::endl;
     // check invalid reply state.
     assert(ok ? value.has_value() : !value.has_value());
   }
@@ -651,11 +656,10 @@ parser<S, T> token(PrettyPrint pretty_print, Match match) {
       std::is_convertible_v<PrettyPrint, std::function<std::string(V)>>,
       "pretty printer with wrong type");
 
-  static_assert(
-      std::is_convertible_v<Match, std::function<std::optional<T>(V)>>,
-      "match has the wrong type");
+  static_assert(std::is_convertible_v<Match, std::function<bool(V)>>,
+                "match has the wrong type");
 
-  return parser<S, T>([&match, &pretty_print](S state, Conts<S, T> cont) {
+  return parser<S, T>([match, pretty_print](S state, Conts<S, T> cont) {
     std::optional<std::tuple<V, D>> r = state.uncons(); // fetch from stream.
     if (!r.has_value()) {
       auto error = unexpect_error(state.get_position(), "The stream is empty");
@@ -663,6 +667,7 @@ parser<S, T> token(PrettyPrint pretty_print, Match match) {
     }
 
     auto [v, stream] = r.value(); // peek
+
     if (match(v)) {
 
       // valid token, construct a new reply with the token as it's value.
@@ -707,7 +712,7 @@ static void add_expected_message(parser_error &error,
 
 // replce error message with msgs
 template <stream::state_type S, typename T>
-parser<S, T> labels(parser<S, T> p, const std::vector<std::string> &msgs) {
+parser<S, T> labels(parser<S, T> p, std::vector<std::string> msgs) {
 
   return parser<S, T>([&msgs, p](S state, Conts<S, T> cont) {
     auto empty_ok = [&cont, &msgs](reply<S, T> rep) -> bool {

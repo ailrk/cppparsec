@@ -5,6 +5,7 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <sstream>
 #include <string_view>
 #include <type_traits>
 
@@ -19,14 +20,14 @@ struct src_position {
   size_t index; // the index in a container. e.g the index in a string.
 
   std::string to_string() {
-    std::string res = "line: ";
-    res += std::to_string(line);
-    res += ", col: ";
-    res += std::to_string(col);
-    res += ", index: ";
-    res += std::to_string(index);
-
-    return res;
+    std::stringstream ss;
+    ss << "line: ";
+    ss << std::to_string(line);
+    ss << ", col: ";
+    ss << std::to_string(col);
+    ss << ", index: ";
+    ss << std::to_string(index);
+    return ss.str();
   }
 
   friend int operator-(const src_position &p1, const src_position &p2) {
@@ -54,8 +55,9 @@ struct src_position {
   }
 };
 
-constexpr inline src_position default_init_position() {
-  return src_position{1, 1, 0};
+inline std::unique_ptr<src_position> make_default_init_position_unique_ptr() {
+  src_position *sq = new src_position{1, 1, 0};
+  return std::unique_ptr<src_position>(sq);
 }
 
 static_assert(std::is_trivial_v<src_position>, "`Position` should be trivial");
@@ -121,12 +123,10 @@ public:
       : data(s), position(std::make_unique<src_position>(pos)) {}
 
   string_state(std::string_view s)
-      : data(s),
-        position(std::make_unique<src_position>(default_init_position())) {}
+      : data(s), position(make_default_init_position_unique_ptr()) {}
 
   string_state()
-      : data(""),
-        position(std::make_unique<src_position>(default_init_position())) {}
+      : data(""), position(make_default_init_position_unique_ptr()) {}
 
   // copy the string stream with the same state.
   // Thisis essential for retrying.

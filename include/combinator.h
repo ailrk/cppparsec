@@ -213,15 +213,16 @@ namespace cppparsec {
 using namespace stream;
 
 // success if parsed character satisfies the predicate.
-inline parser<string_state, char> satisfy(std::function<bool(char)> pred) {
-  return token<string_state, char>(
-      [=](char c) { return std::string(1, c); },
-      [=](char c) { return pred(c) ? std::optional{c} : std::nullopt; });
+inline parser<string_state, char>
+satisfy(const std::function<bool(char)> &pred) {
+  return token<string_state, char>([=](char c) { return std::string(1, c); },
+                                   pred);
 }
 
 // parse a single character `c`
 inline parser<string_state, char> ch(char c) {
-  return satisfy([=](char o) { return o == c; }) ^ std::string(1, c);
+  return satisfy([=](char o) { return o == c; });
+  // ^ std::string(1, c);
 }
 
 // parse one of the character in the vector `chars`
