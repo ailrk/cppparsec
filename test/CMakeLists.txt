@@ -1,11 +1,6 @@
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
 set(EXECUTABLE_OUTPUT_PATH "${PROJECT_BINARY_DIR}/bin")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
-if ("${CMAKE_CXX_FLAGS}" MATCHES ".*-fno-rtti.*")
-  message("cppparsec: rtti is disabled")
-endif()
-
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")

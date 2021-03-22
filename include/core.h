@@ -40,16 +40,13 @@ public:
 
   parser_error error;
 
-  reply() : consumed(false), ok(false), value(std::nullopt), state(), error() {
-    std::cout << "reply" << std::endl;
-  }
+  reply() : consumed(false), ok(false), value(std::nullopt), state(), error() {}
 
   // NOTE: You should never call this direclty.
   reply(bool consumed, bool ok, std::optional<T> value, S state,
         parser_error error)
       : consumed(consumed), ok(ok), value(value), state(state), error(error) {
 
-    std::cout << "position: " << state.get_position().to_string() << std::endl;
     // check invalid reply state.
     assert(ok ? value.has_value() : !value.has_value());
   }
@@ -714,8 +711,8 @@ static void add_expected_message(parser_error &error,
 template <stream::state_type S, typename T>
 parser<S, T> labels(parser<S, T> p, std::vector<std::string> msgs) {
 
-  return parser<S, T>([&msgs, p](S state, Conts<S, T> cont) {
-    auto empty_ok = [&cont, &msgs](reply<S, T> rep) -> bool {
+  return parser<S, T>([msgs, p](S state, Conts<S, T> cont) {
+    auto empty_ok = [cont, msgs](reply<S, T> rep) -> bool {
       reply<S, T> rep1(rep);
       parser_error &error = rep1.error;
 
@@ -723,7 +720,7 @@ parser<S, T> labels(parser<S, T> p, std::vector<std::string> msgs) {
       return cont.empty_ok(rep1);
     };
 
-    auto empty_err = [&cont, &msgs](parser_error error) -> bool {
+    auto empty_err = [cont, msgs](parser_error error) -> bool {
       add_expected_message(error, msgs);
       return cont.empty_err(error);
     };

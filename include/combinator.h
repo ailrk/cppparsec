@@ -298,6 +298,11 @@ inline parser<string_state, char> oct_digit =
 // parse anuy characters.
 inline parser<string_state, char> any_char = satisfy(const_(true));
 
+// convert a vector of char to string
+inline std::string vec_to_str(std::vector<char> v) {
+  return std::string(v.begin(), v.end());
+}
+
 // parse string.
 inline parser<string_state, std::string> str(std::string s) {
 
@@ -310,9 +315,8 @@ inline parser<string_state, std::string> str(std::string s) {
     chparsers.push_back(ch(c));
   }
 
-  return collect(chparsers).map([](std::vector<char> charvec) {
-    return std::string(charvec.begin(), charvec.end());
-  });
+  return collect(chparsers).map(
+      [](std::vector<char> charvec) { return vec_to_str(charvec); });
 }
 
 } // namespace cppparsec
