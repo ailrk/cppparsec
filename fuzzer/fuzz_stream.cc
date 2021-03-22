@@ -11,6 +11,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
   s.get_col();
   s.get_line();
   uint64_t n = *reinterpret_cast<const uint64_t *>(Data);
+  std::cout << n << std::endl;
   s.eat(n);
 
   return 0;

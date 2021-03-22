@@ -200,7 +200,7 @@ std::optional<std::tuple<char, std::string_view>> string_state::uncons() const {
 // Eat the next n tokens, and return a new StringStream with
 // updated position.
 string_state string_state::eat(size_t n) const {
-  if (n == 0) {
+  if (n == 0 || n > data.size()) {
     return *this;
   } else {
     return string_state(data.substr(n), next_position(n));
