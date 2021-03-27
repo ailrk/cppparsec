@@ -100,14 +100,7 @@ template <typename P, typename Open, typename Close,
 inline parser<S, T>
 
 between(Open o, Close c, P p) {
-  using Ot_ = typename parser_trait<Open>::value_type;
-  using Ct_ = typename parser_trait<Close>::value_type;
-
-  return o >>= [=]([[maybe_unused]] Ot_ _1) {
-    return p >>= [=](T v) {
-      return c >>= [=]([[maybe_unused]] Ct_ _2) { return pure<S>(v); };
-    };
-  };
+  return o >> (p >>= [=](T v) { return c >> pure<S>(v); });
 }
 
 // parser `p`. If it's failed without consume anything, return t.
@@ -136,7 +129,7 @@ template <stream::state_type S, typename T>
 parser<S, unit>
 
 skip_many1(parser<S, T> p) {
-  return p >>= [=]([[maybe_unused]] T _) { return skip_many(p); };
+  return p >> skip_many(p);
 }
 
 // parse `p` 1 or more times.
@@ -180,13 +173,11 @@ template <stream::state_type S, typename T, typename SepEnd>
 parser<S, std::vector<T>>
 
 sepend_by1(parser<S, T> p, parser<S, SepEnd> sepend) {
-  return (p >>= [=](T v) {
-    return sepend >>= [=]([[maybe_unused]]
-                          typename parser_trait<SepEnd>::value_type _1) {
-      return sepend_by(p, sepend) >>=
-             [=](std::vector<T> vs) { vs.insert(vs.begin(), 1, v); };
+  return p >>= [=](T v) {
+    return sepend >> sepend_by(p, sepend) >>= [=](std::vector<T> vs) {
+      vs.insert(vs.begin(), 1, v);
     } | pure<S>(std::vector{v});
-  });
+  };
 }
 
 // parser `p` 0 or more times separated by sepend. it's allowed to end the
@@ -216,9 +207,10 @@ template <stream::state_type S, typename T>
 parser<S, T>
 
 chainl1(parser<S, T> p, parser<S, std::function<T(T, T)>> op) {
-  std::function<parser<S, T>(T)> rest = [=](T x) {
-    return op >>= [=](std::function<T(T, T)> f) {
-      return p >>= [=](T y) { return rest(f(x, y)); };
+  std::function<parser<S, T>(T)> rest;
+  rest = [&rest, op, p](T x) {
+    return op >>= [&rest, x, p](std::function<T(T, T)> f) {
+      return p >>= [&rest, f, x](T y) { return rest(f(x, y)); };
     };
   };
 
@@ -256,6 +248,18 @@ not_followed_by(parser<S, T> p) {
 
 template <stream::state_type S, typename T, typename End>
 parser<S, std::vector<T>> many_till(parser<S, T> p, parser<S, End> end);
+
+// handling recursive definitions.
+template <stream::state_type S, typename T>
+parser<S, T> placeholder(std::optional<parser<S, T>> p) {
+  return parser<S, T>([=](S state, Conts<S, T> cont) {
+    parser<S, T> p1 = p.value();
+    T a = p1(state).get();
+    reply<S, T> r =
+        reply<S, T>::mk_empty_ok_reply(a, state, unknown_error(state));
+    return cont.empty_ok(r);
+  });
+}
 
 } // namespace cppparsec
 
@@ -306,8 +310,7 @@ inline parser<string_state, char>
     space = satisfy([](char c) { return isspace(c); }) ^ "space";
 
 // skip continous spaces.
-// inline parser<string_state, unit> spaces =
-//     skip_many<>(space) ^ "white space";
+inline parser<string_state, unit> spaces = skip_many(space) ^ "white space";
 
 // unix new line
 inline parser<string_state, char>

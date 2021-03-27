@@ -1,5 +1,6 @@
 #include "catch2/catch.hpp"
 #include "cppparsec.h"
+#include <optional>
 
 // baseline test for each combinators
 
@@ -56,11 +57,14 @@ TEST_CASE("character parser") {
   }
 
   SECTION("digits") {
-    auto p = many(digit)
-                 .map([](std::vector<char> v) {
-                   return std::string(v.begin(), v.end());
-                 })
-                 .map([](std::string s) { return std::stoi(s); });
+    auto p =
+
+        many(digit)
+            .map([](std::vector<char> v) {
+              return std::string(v.begin(), v.end());
+            })
+            .map([](std::string s) { return std::stoi(s); });
+
     auto r = p(s1);
 
     REQUIRE(r.get() == 123);
@@ -72,16 +76,6 @@ TEST_CASE("character parser") {
     auto r = p(s).get();
     REQUIRE(vec_to_str(r) == "abc");
   }
-
-  // TODO
-  // // test the combination of nop + %=
-  // SECTION("cons 2") {
-  //   auto p = cons(any_char,
-  //                 zerop<string_state, unit> %= std::vector<char>{'b', 'c'});
-
-  //   auto r = p(s).get();
-  //   REQUIRE(vec_to_str(r) == "abc");
-  // }
 
   SECTION("between") {
     string_state s0("{a}");
@@ -133,6 +127,36 @@ TEST_CASE("chain") {
   using namespace cppparsec;
   string_state s("abc\ndef\nghi\n");
   string_state s1("123");
+  auto sym = [](std::string a) { return str(a) << spaces; };
 
-  SECTION("chainl1 1") {}
+  using binop = std::function<int(int, int)>;
+
+  auto mulop = (sym("*") %= binop([](int a, int b) -> int { return a * b; })) |
+               (sym("/") %= binop([](int a, int b) -> int { return a / b; }));
+
+  auto addop = (sym("+") %= binop([](int a, int b) -> int { return a + b; })) |
+               (sym("-") %= binop([](int a, int b) -> int { return a - b; }));
+
+  auto integer =
+      (many(digit) >>= vstr) > [](std::string n) { return std::stoi(n); };
+
+  std::optional<parser<string_state, int>> expr_;
+  auto factor = between(sym("("), sym(")"), placeholder(expr_)) | integer;
+  auto term = chainl1(factor, mulop);
+  auto expr = chainl1(term, addop);
+  expr_.emplace(expr);
+
+  SECTION("simple") {
+    auto r1 = sym("a")(s).get();
+    REQUIRE(r1 == "a");
+
+    auto r2 = integer(s1).get();
+    REQUIRE(r2 == 123);
+  }
+
+  SECTION("chainl1 1") {
+    string_state s("1*2*3");
+    auto r = expr(s).get();
+    std::cout << r << std::endl;
+  }
 }

@@ -210,12 +210,12 @@ TEST_CASE("parser map") {
     REQUIRE(r.get() == "string");
   }
 
-  SECTION("int -> char -> doube, with operator") {
-    // life time is ok because all parser get copied.
-    auto p1 = p > fn > fn1 > fn2 > fn3;
-    auto r = p1(s);
-    REQUIRE(r.get() == "string");
-  }
+  // SECTION("int -> char -> doube, with operator") {
+  //   // life time is ok because all parser get copied.
+  //   auto p1 = p > fn > fn1 > fn2 > fn3;
+  //   auto r = p1(s);
+  //   REQUIRE(r.get() == "string");
+  // }
 }
 
 TEST_CASE("bind") {

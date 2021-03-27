@@ -236,26 +236,25 @@ public:
   friend parser<S, T> operator|<>(parser<S, T>, parser<S, T>);
   friend parser<S, T> operator*<>(parser<S, T>, parser<S, T>);
 
+  template <typename Fn, typename U = typename function_traits<Fn>::return_type>
+  parser<S, U> operator>(const Fn &fn) {
+    return map(fn);
+  }
+
   template <typename Fm,
             typename U = typename parser_trait<
                 typename function_traits<Fm>::return_type>::value_type>
-  friend parser<S, U>
-
-  operator>>=(parser<S, T> p, Fm fm) {
+  friend parser<S, U> operator>>=(parser<S, T> p, Fm fm) {
     return p.bind(fm);
   }
 
   template <typename U>
-  friend parser<S, U>
-
-  operator>>(parser<S, T> p, parser<S, U> q) {
+  friend parser<S, U> operator>>(parser<S, T> p, parser<S, U> q) {
     return p >>= [=]([[maybe_unused]] T _) { return q; };
   }
 
   template <typename U>
-  friend parser<S, T>
-
-  operator<<(parser<S, T> p, parser<S, U> q) {
+  friend parser<S, T> operator<<(parser<S, T> p, parser<S, U> q) {
     return p >>= [=](T v) { return q %= v; };
   }
 };
