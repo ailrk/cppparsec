@@ -22,25 +22,44 @@ inline parser<S, T> choice(std::vector<parser<S, T>> options) {
   return result;
 }
 
+// push the result of parser `p` into the head of the result of parser
+// `container`
+template <stream::state_type S, typename T>
+inline parser<S, std::vector<T>> cons(parser<S, T> p,
+                                      parser<S, std::vector<T>> container) {
+
+  return p >>= [=](T v) {
+    return container >>= [=](std::vector<T> vs) {
+      vs.push_back(v);
+      std::rotate(vs.rbegin(), vs.rbegin() + 1, vs.rend());
+      return parser<S, std::vector<T>>::pure(vs);
+    };
+  };
+}
+
+// push the result of parser `p` to the end of the result of parser
+// `container`
+template <stream::state_type S, typename T>
+inline parser<S, std::vector<T>> snoc(parser<S, T> p,
+                                      parser<S, std::vector<T>> container) {
+
+  return p >>= [=](T v) {
+    return container >>= [=](std::vector<T> vs) {
+      vs.push_back(v);
+      return parser<S, std::vector<T>>::pure(vs);
+    };
+  };
+}
+
 // convert a vector of parsers into a parser that return a vector.
 template <stream::state_type S, typename T>
 inline parser<S, std::vector<T>> collect(std::vector<parser<S, T>> ps) {
-  size_t size = ps.size();
-
-  std::function<parser<S, std::vector<T>>(size_t, std::vector<T>)> collect_;
-
-  collect_ = [&](size_t idx, std::vector<T> acc) {
-    if (idx == size) {
-      return parser<S, std::vector<T>>::pure(acc);
-    } else {
-      return ps[idx] >>= [&collect_, &acc, idx](T v) {
-        acc.push_back(v);
-        return collect_(idx + 1, acc);
-      };
-    }
-  };
-
-  return collect_(0, {});
+  auto r = parser<S, std::vector<T>>::pure({});
+  for (auto iter = ps.rbegin(); iter != ps.rend(); ++iter) {
+    auto &p = *iter;
+    r = cons(p, r);
+  }
+  return r;
 }
 
 template <stream::state_type S, typename T>
@@ -68,14 +87,6 @@ inline parser<S, std::vector<T>> count(uint32_t n, parser<S, T> p) {
     return replicate(n, {});
   }
 }
-
-// template <typename S, typename T, typename C>
-// inline parser<S, T> cons(P p, Ps ps) {
-//   return p >>= [](Ps container) {
-
-//   };
-
-// }
 
 template <typename P, typename Open, typename Close,
           typename S = typename parser_trait<P>::stream_t,
@@ -117,13 +128,7 @@ parser<S, unit> skip_many1(parser<S, T> p) {
 // parse `p` 1 or more times.
 template <stream::state_type S, typename T>
 parser<S, std::vector<T>> many1(parser<S, T> p) {
-  return p >>= [=](T v) {
-    return many(p) >>= [=](std::vector<T> vs) {
-      vs.push_back(v);
-      std::rotate(vs.rbegin(), vs.rbegin() + 1, vs.rend());
-      return parser<S, std::vector<T>>::pure(vs);
-    };
-  };
+  return cons(p, many(p));
 }
 
 // parse `p` 1 or more times separated by sep.
@@ -132,15 +137,7 @@ template <typename P, typename Sep,
           typename T = typename parser_trait<P>::value_type>
 
 parser<S, std::vector<T>> sep_by1(P p, Sep sep) {
-
-  return p >>= [=]([[maybe_unused]] T v) {
-    return many1(sep >> p) >>= [=](std::vector<T> vs) {
-      std::vector<T> xs = vs;
-      xs.push_back(v);
-      std::rotate(xs.rbegin(), xs.rbegin() + 1, xs.rend());
-      return parser<S, std::vector<T>>::pure(xs);
-    };
-  } ^ "many1";
+  return cons(p, many1(sep >> p));
 }
 
 // parse `p` 0 or more times  separated by sep.
@@ -327,13 +324,18 @@ inline parser<string_state, char> oct_digit =
 inline parser<string_state, char> any_char = satisfy(const_(true));
 
 // convert a vector of char to string
-inline std::string vec_to_str(std::vector<char> v) {
+inline auto vec_to_str = [](std::vector<char> v) -> std::string {
   return std::string(v.begin(), v.end());
-}
+};
+
+// convert a parser of char vector to a parser of string.
+inline auto vstr =
+    [](std::vector<char> cs) -> parser<string_state, std::string> {
+  return parser<string_state, std::string>::pure(vec_to_str(cs));
+};
 
 // parse string.
-inline parser<string_state, std::string> str(std::string s) {
-
+inline auto str = [](std::string s) -> parser<string_state, std::string> {
   if (s == "") {
     return parser<string_state, std::string>::pure("");
   }
@@ -345,6 +347,6 @@ inline parser<string_state, std::string> str(std::string s) {
 
   return collect(chparsers).map(
       [](std::vector<char> charvec) { return vec_to_str(charvec); });
-}
+};
 
 } // namespace cppparsec

@@ -188,8 +188,9 @@ public:
   template <typename Fn, typename U = typename function_traits<Fn>::return_type>
   parser<S, U> map(const Fn &fn);
 
-  template <typename Fm, typename P = typename function_traits<Fm>::return_type,
-            typename U = typename parser_trait<P>::value_type>
+  template <typename Fm,
+            typename U = typename parser_trait<
+                typename function_traits<Fm>::return_type>::value_type>
   parser<S, U> bind(Fm fm);
 
   template <typename M, typename Fn = typename parser_trait<M>::value_type,
@@ -218,8 +219,9 @@ public:
   friend parser<S, T> operator|<>(parser<S, T>, parser<S, T>);
   friend parser<S, T> operator*<>(parser<S, T>, parser<S, T>);
 
-  template <typename Fm, typename P = typename function_traits<Fm>::return_type,
-            typename U = typename parser_trait<P>::value_type>
+  template <typename Fm,
+            typename U = typename parser_trait<
+                typename function_traits<Fm>::return_type>::value_type>
   friend parser<S, U> operator>>=(parser<S, T> p, Fm fm) {
     return p.bind(fm);
   }
@@ -314,7 +316,7 @@ parser<S, U> parser<S, T>::map(const Fn &fn) {
 // Monadic bind
 // m a -> (a -> m b) -> m b
 template <stream::state_type S, typename T>
-template <typename Fm, typename P, typename U>
+template <typename Fm, typename U>
 parser<S, U> parser<S, T>::bind(Fm fm) {
   static_assert(std::is_convertible_v<Fm, std::function<parser<S, U>(T)>>,
                 "Monadic function for bind has the wrong type");
@@ -604,7 +606,7 @@ parser<S, std::vector<T>> many_accum(AccumFn fn, parser<S, T> p) {
         {
 
             .consumed_ok = [&walk](reply<S, T> rep) -> bool {
-              auto v = rep.value.value();
+              auto v = rep.get();
               walk({v}, rep);
               return rep.ok;
             },
@@ -632,11 +634,11 @@ template <typename P, typename S = typename parser_trait<P>::stream_t,
 
 parser<S, std::vector<T>> many(P p) {
   return many_accum(
-             [](T v, std::vector<T> acc) {
-               acc.push_back(v);
-               return acc;
-             },
-             p);
+      [](T v, std::vector<T> acc) {
+        acc.push_back(v);
+        return acc;
+      },
+      p);
 }
 
 // TODO: now just make a new empty vector. try to reuse empty acc instead.

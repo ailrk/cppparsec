@@ -193,14 +193,14 @@ TEST_CASE("parser map") {
   SECTION("int -> char") {
     auto p1 = p.map(fn);
     auto r = p1(s);
-    REQUIRE(r.value.value() == 1);
+    REQUIRE(r.get() == 1);
   }
 
   SECTION("int -> char -> doube") {
     // life time is ok because all parser get copied.
     auto p1 = p.map(fn).map(fn1).map(fn2).map(fn3);
     auto r = p1(s);
-    REQUIRE(r.value.value() == "string");
+    REQUIRE(r.get() == "string");
   }
 }
 
@@ -236,20 +236,20 @@ TEST_CASE("bind") {
   SECTION("basic bind") {
     auto p1 = p.bind(fn1);
     auto r = p1(s);
-    REQUIRE(r.value.value() == 1);
+    REQUIRE(r.get() == 1);
   }
 
   SECTION("multiple bind0") {
     auto p1 = p.bind(fn).bind(fn1).bind(fn2);
     auto r = p1(s);
-    REQUIRE(r.value.value() == "string");
+    REQUIRE(r.get() == "string");
   }
 
   SECTION("multiple bind1") {
     // auto p1 = p.bind(fn).bind(fn1).bind(fn2);
     auto p1 = ((p >>= fn1) >>= fn) >>= fn2;
-    auto r = p1(s);
-    REQUIRE(r.value.value() == "string");
+    auto r = p1(s).get();
+    REQUIRE(r == "string");
   }
 
   SECTION("nested bind1") {
@@ -260,9 +260,9 @@ TEST_CASE("bind") {
                [=]([[maybe_unused]] char c) { return PChar::pure(b); };
       };
     };
-    auto r = p1(s);
+    auto r = p1(s).get();
 
-    std::cout << r.value.value() << std::endl;
+    REQUIRE(r == 'b');
   }
 }
 
@@ -285,21 +285,21 @@ TEST_CASE("apply") {
   SECTION("apply 1") {
     auto p1 = p.apply(m1);
     auto r = p1(s);
-    REQUIRE(r.value.value() == 99);
+    REQUIRE(r.get() == 99);
   }
 
   SECTION("apply 2") {
 
     auto p1 = p.apply(m1).apply(m2);
     auto r = p1(s);
-    REQUIRE(r.value.value() == 'd');
+    REQUIRE(r.get() == 'd');
   }
 
   SECTION("apply 3") {
 
     auto r = (p.apply(m1).apply(m2) >>=
               []([[maybe_unused]] char v) { return PInt::pure(122); })(s);
-    REQUIRE(r.value.value() == 122);
+    REQUIRE(r.get() == 122);
   }
 }
 
@@ -312,14 +312,36 @@ TEST_CASE("token") {
 
     auto p1 = token<string_state, char>(printer, match);
     auto r = p1(s);
-    REQUIRE(r.value.value() == 'a');
+    REQUIRE(r.get() == 'a');
   }
 
   SECTION("token 2") {
     auto p1 = token<string_state, char>(printer, match);
     auto p2 = p1 >> p1 >> p1 >> p1 >> p1;
     auto r = p2(s);
-    REQUIRE(r.value.value() == 'd');
+    REQUIRE(r.get() == 'd');
+  }
+}
+
+TEST_CASE("alt") {
+  using namespace cppparsec;
+  using namespace cppparsec::stream;
+  auto p = token<string_state, char>(printer, match);
+  string_state s("abc\ndef\nghi\n");
+
+  SECTION("alt 1") {
+    auto p = ch('a');
+    auto p1 = ch('b');
+    auto r = (p1 | p)(s).get();
+    REQUIRE(r == 'a');
+  }
+
+  SECTION("alt 2") {
+    auto p = ch('a');
+    auto p1 = ch('b');
+    auto p2 = ch('c');
+    auto r = ((p1 | p) >> (p1 | p2) >> p2)(s).get();
+    REQUIRE(r == 'c');
   }
 }
 
@@ -336,7 +358,7 @@ TEST_CASE("many related") {
     auto pchars = many(p);
     auto r = pchars(s);
 
-    auto vec = r.value.value();
+    auto vec = r.get();
     REQUIRE(std::string{vec.begin(), vec.end()} == "abc\ndef\nghi\n");
   }
 

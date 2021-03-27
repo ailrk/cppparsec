@@ -30,6 +30,31 @@ TEST_CASE("character parser") {
     REQUIRE(r.get() == 'c');
   }
 
+  SECTION("string empty") {
+    string_state s("");
+    auto p = str("");
+    auto r = p(s).get();
+    REQUIRE(r == "");
+  }
+
+  SECTION("string 1") {
+    auto p = str("a");
+    auto r = p(s).get();
+    REQUIRE(r == "a");
+  }
+
+  SECTION("string 2") {
+    auto p = str("ab");
+    auto r = p(s).get();
+    REQUIRE(r == "ab");
+  }
+
+  SECTION("string long") {
+    auto p = str("abc");
+    auto r = p(s).get();
+    REQUIRE(r == "abc");
+  }
+
   SECTION("digits") {
     auto p = many(digit)
                  .map([](std::vector<char> v) {
@@ -39,6 +64,13 @@ TEST_CASE("character parser") {
     auto r = p(s1);
 
     REQUIRE(r.get() == 123);
+  }
+
+  SECTION("cons") {
+    auto p = cons(any_char,
+                  parser<string_state, std::vector<char>>::pure({'b', 'c'}));
+    auto r = p(s).get();
+    REQUIRE(vec_to_str(r) == "abc");
   }
 
   SECTION("between") {
@@ -72,11 +104,8 @@ TEST_CASE("character parser") {
   }
 
   SECTION("sep by1") {
-
     string_state s1("1,2,3");
-    auto p = sep_by1(digit, ch(',')).map([](std::vector<char> vs) {
-      return vec_to_str(vs);
-    });
+    auto p = sep_by1(digit, ch(',')) >>= vstr;
     auto r = p(s1).get();
     REQUIRE(r == "123");
   }
@@ -85,7 +114,7 @@ TEST_CASE("character parser") {
     string_state s1("135a1");
     auto p = sep_by(digit, ch(','));
     auto r = p(s1).get();
-    std::cout << vec_to_str(r) << "|"<< std::endl;
+    std::cout << vec_to_str(r) << "|" << std::endl;
     REQUIRE(r.size() == 0);
   }
 }
