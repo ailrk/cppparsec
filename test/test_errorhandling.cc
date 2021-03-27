@@ -4,5 +4,5 @@
 // testing error handling.
 
 TEST_CASE("basic error") {
-  SECTION("pain parser error") { REQUIRE(false); }
+    SECTION("pain parser error") { REQUIRE(false); }
 }
