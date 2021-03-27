@@ -19,6 +19,8 @@ namespace cppparsec {
 
 using namespace cppparsec::util;
 
+struct unit {};
+
 // The return type of a parser. It contains the current state (stream) and
 // parsed result.
 // `consumed` and `ok` are used to indicate the state of the parser.
@@ -51,8 +53,17 @@ public:
     assert(ok ? value.has_value() : !value.has_value());
   }
 
+  T get() {
+    if (value.has_value()) {
+      return value.value();
+    } else {
+      throw parse_failed(error.to_string());
+    }
+  }
+
   const reply &merge_with_error(const parser_error &new_error) {
     error = error + new_error;
+    std::cerr << error.to_string() << std::endl;
     return *this;
   }
 
@@ -123,7 +134,7 @@ template <typename> struct parser_trait {};
 
 template <typename S, typename T> struct parser_trait<parser<S, T>> {
   using reply_t = typename parser<S, T>::reply_t;
-  using type = typename parser<S, T>::type;
+  using value_type = typename parser<S, T>::value_type;
   using stream_t = typename parser<S, T>::stream_t;
 };
 
@@ -134,7 +145,7 @@ template <stream::state_type S, typename T> class parser {
 
 public:
   using reply_t = reply<S, T>;
-  using type = T;
+  using value_type = T;
   using stream_t = S;
 
   // Using shared_ptr here so we can ensure the life time of unparser last
@@ -150,11 +161,8 @@ public:
   //    the parser created by p1.map(f1) lives till the end of the statement.
   // 3. If we move p1 into p2 we can't use it as a standalone parser
   // anymore.
-  //
-  // Shared ptr introduce more 8 bytes overhead, but it nicely cover all cases
-  // above.
-  //
-  // Btw the whole parser is just a wrapper over the shared_ptr,
+  // shared_ptr helps solve problems above.
+  // The whole parser is just a wrapper over the shared_ptr,
   // copy Parser will copy 16 bytes.
   //
   // Continuation and shared ptr unparser are implementation details, and you
@@ -181,10 +189,10 @@ public:
   parser<S, U> map(const Fn &fn);
 
   template <typename Fm, typename P = typename function_traits<Fm>::return_type,
-            typename U = typename parser_trait<P>::type>
+            typename U = typename parser_trait<P>::value_type>
   parser<S, U> bind(Fm fm);
 
-  template <typename M, typename Fn = typename parser_trait<M>::type,
+  template <typename M, typename Fn = typename parser_trait<M>::value_type,
             typename U = typename function_traits<Fn>::return_type>
   parser<S, U> apply(M m);
 
@@ -211,7 +219,7 @@ public:
   friend parser<S, T> operator*<>(parser<S, T>, parser<S, T>);
 
   template <typename Fm, typename P = typename function_traits<Fm>::return_type,
-            typename U = typename parser_trait<P>::type>
+            typename U = typename parser_trait<P>::value_type>
   friend parser<S, U> operator>>=(parser<S, T> p, Fm fm) {
     return p.bind(fm);
   }
@@ -219,6 +227,15 @@ public:
   template <typename U>
   friend parser<S, U> operator>>(parser<S, T> p, parser<S, U> q) {
     return p >>= [=]([[maybe_unused]] T _) { return q; };
+  }
+
+  template <typename U>
+  friend parser<S, T> operator<<(parser<S, T> p, parser<S, U> q) {
+    return p >>= [=](T v) {
+      return q >>= [v = std::move(v)]([[maybe_unused]] U _) {
+        return parser<S, T>::pure(v);
+      };
+    };
   }
 };
 
@@ -611,15 +628,15 @@ parser<S, std::vector<T>> many_accum(AccumFn fn, parser<S, T> p) {
 
 // parse `p` zero or more times.
 template <typename P, typename S = typename parser_trait<P>::stream_t,
-          typename T = typename parser_trait<P>::type>
+          typename T = typename parser_trait<P>::value_type>
 
 parser<S, std::vector<T>> many(P p) {
   return many_accum(
-      [](T v, std::vector<T> acc) {
-        acc.push_back(v);
-        return acc;
-      },
-      p);
+             [](T v, std::vector<T> acc) {
+               acc.push_back(v);
+               return acc;
+             },
+             p);
 }
 
 // TODO: now just make a new empty vector. try to reuse empty acc instead.
@@ -627,15 +644,15 @@ parser<S, std::vector<T>> many(P p) {
 template <typename P,
 
           typename S = typename parser_trait<P>::stream_t,
-          typename T = typename parser_trait<P>::type>
+          typename T = typename parser_trait<P>::value_type>
 
-parser<S, std::monostate> skip_many(P p) {
+parser<S, unit> skip_many(P p) {
   return many_accum(
              []([[maybe_unused]] T v, [[maybe_unused]] std::vector<T> acc) {
                return std::vector<T>{};
              },
              p) >>
-         parser<S, std::monostate>::pure({});
+         parser<S, unit>::pure({});
 }
 
 // primitive term parser.
@@ -692,7 +709,7 @@ namespace cppparsec {
 
 static void add_expected_message(parser_error &error,
                                  const std::vector<std::string> &msgs) {
-  if (!error.is_unkown_error()) {
+  if (!error.is_unknown_error()) {
     if (msgs.size() == 0) {
       error.add_message({error_t::Expect, ""});
 

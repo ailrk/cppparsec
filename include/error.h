@@ -41,7 +41,7 @@ public:
 
   // if the messages is empty
   bool empty() { return messages.empty(); }
-  bool is_unkown_error() { return empty(); }
+  bool is_unknown_error() { return empty(); }
 
   // merge errors to get a new error.
   friend parser_error operator+(const parser_error &e1,
@@ -68,10 +68,9 @@ public:
   void set_position(src_position pos) { position = pos; }
   src_position get_position() const { return position; }
 
+  // add new message
   void add_message(message_t message) {
     // messages.erase(std::remove(messages.begin(), messages.end(), message));
-    messages.erase(std::remove(messages.begin(), messages.end(), message));
-
     messages.push_back(message);
   }
 
@@ -82,9 +81,16 @@ public:
   // show function
   std::string to_string() const {
     std::stringstream ss;
-    ss << position.line << ":" << position.col;
-    for (const auto &msg : messages) {
-      ss << " " << msg.to_string();
+    ss << "line: " << position.line << ", column: " << position.col << ". ";
+    if (messages.size() == 0) {
+      ss << "no error info";
+    } else {
+      ss << messages.size() << " errors occurred.\n";
+      ss << "details (lastest on top):\n";
+      for (auto iter = messages.rbegin(); iter != messages.rend(); ++iter) {
+        auto msg = *iter;
+        ss << " - " << msg.to_string() << "\n";
+      }
     }
 
     return ss.str();
@@ -124,6 +130,16 @@ public:
     return "the combinator `many` cannot be used with a parser "
            "that accept an empty string";
   }
+};
+
+class parse_failed : public std::exception {
+  std::string msg;
+
+public:
+  parse_failed(const std::string &msg) : msg("parse failed. " + msg) {}
+  parse_failed() : msg("parse failed. ") {}
+
+  const char *what() const noexcept override { return msg.c_str(); }
 };
 
 } // namespace cppparsec

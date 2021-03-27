@@ -251,6 +251,19 @@ TEST_CASE("bind") {
     auto r = p1(s);
     REQUIRE(r.value.value() == "string");
   }
+
+  SECTION("nested bind1") {
+
+    auto p1 = ch('a') >>= []([[maybe_unused]] char a) {
+      return ch('b') >>= [=](char b) {
+        return ch('c') >>=
+               [=]([[maybe_unused]] char c) { return PChar::pure(b); };
+      };
+    };
+    auto r = p1(s);
+
+    std::cout << r.value.value() << std::endl;
+  }
 }
 
 TEST_CASE("apply") {

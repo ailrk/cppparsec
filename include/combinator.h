@@ -69,13 +69,21 @@ inline parser<S, std::vector<T>> count(uint32_t n, parser<S, T> p) {
   }
 }
 
+// template <typename S, typename T, typename C>
+// inline parser<S, T> cons(P p, Ps ps) {
+//   return p >>= [](Ps container) {
+
+//   };
+
+// }
+
 template <typename P, typename Open, typename Close,
           typename S = typename parser_trait<P>::stream_t,
-          typename T = typename parser_trait<P>::type>
+          typename T = typename parser_trait<P>::value_type>
 
 inline parser<S, T> between(Open o, Close c, P p) {
-  using Ot_ = typename parser_trait<Open>::type;
-  using Ct_ = typename parser_trait<Close>::type;
+  using Ot_ = typename parser_trait<Open>::value_type;
+  using Ct_ = typename parser_trait<Close>::value_type;
 
   return o >>= [=]([[maybe_unused]] Ot_ _1) {
     return p >>= [=](T v) {
@@ -87,15 +95,14 @@ inline parser<S, T> between(Open o, Close c, P p) {
 
 // parser `p`. If it's failed without consume anything, return t.
 template <stream::state_type S, typename T>
-inline parser<S, T> option(T t, parser<S, T> p) {
+inline parser<S, T> with_default(T t, parser<S, T> p) {
   return p | parser<S, T>::pure(t);
 }
 
 // parser `p`, if it's failed without consume anything, return std::nullopt.
 template <stream::state_type S, typename T>
-inline parser<S, std::optional<T>> option(parser<S, T> p) {
-  return option(std::nullopt,
-                p.map([](T v) -> std::optional<T> { return {v}; }));
+inline parser<S, std::optional<T>> maybe(parser<S, T> p) {
+  return with_default({}, p.map([](T v) -> std::optional<T> { return {v}; }));
 }
 
 template <stream::state_type S, typename T, typename End>
@@ -103,7 +110,7 @@ parser<S, std::vector<T>> any_token(parser<S, T> p);
 
 // skip at least 1 and return nothing.
 template <stream::state_type S, typename T>
-parser<S, std::monostate> skip_many1(parser<S, T> p) {
+parser<S, unit> skip_many1(parser<S, T> p) {
   return p >>= [=]([[maybe_unused]] T _) { return skip_many(p); };
 }
 
@@ -112,34 +119,37 @@ template <stream::state_type S, typename T>
 parser<S, std::vector<T>> many1(parser<S, T> p) {
   return p >>= [=](T v) {
     return many(p) >>= [=](std::vector<T> vs) {
-      std::vector<T>::insert(vs.begin(), 1, v);
+      vs.push_back(v);
+      std::rotate(vs.rbegin(), vs.rbegin() + 1, vs.rend());
       return parser<S, std::vector<T>>::pure(vs);
     };
   };
-}
-
-// parse `p` 0 or more times  separated by sep.
-template <typename P, typename Sep,
-          typename S = typename parser_trait<P>::stream_t,
-          typename T = typename parser_trait<P>::type>
-
-parser<S, std::vector<T>> sep_by(P p, Sep sep) {
-  return many(sep >> p) >>=
-         [=](std::vector<T> vs) { return parser<S, std::vector<T>>::pure(vs); };
 }
 
 // parse `p` 1 or more times separated by sep.
 template <typename P, typename Sep,
           typename S = typename parser_trait<P>::stream_t,
-          typename T = typename parser_trait<P>::type>
+          typename T = typename parser_trait<P>::value_type>
 
 parser<S, std::vector<T>> sep_by1(P p, Sep sep) {
-  return p >>= [=](T v) {
-    return many(sep >> p) >>= [=](std::vector<T> vs) {
-      std::vector<T>::insert(vs.begin(), 1, v);
-      return parser<S, std::vector<T>>::pure(vs);
+
+  return p >>= [=]([[maybe_unused]] T v) {
+    return many1(sep >> p) >>= [=](std::vector<T> vs) {
+      std::vector<T> xs = vs;
+      xs.push_back(v);
+      std::rotate(xs.rbegin(), xs.rbegin() + 1, xs.rend());
+      return parser<S, std::vector<T>>::pure(xs);
     };
-  };
+  } ^ "many1";
+}
+
+// parse `p` 0 or more times  separated by sep.
+template <typename P, typename Sep,
+          typename S = typename parser_trait<P>::stream_t,
+          typename T = typename parser_trait<P>::value_type>
+
+parser<S, std::vector<T>> sep_by(P p, Sep sep) {
+  return sep_by1(p, sep) | parser<S, std::vector<T>>::pure({});
 }
 
 template <stream::state_type S, typename T, typename SepEnd>
@@ -151,7 +161,7 @@ template <stream::state_type S, typename T, typename SepEnd>
 parser<S, std::vector<T>> sepend_by1(parser<S, T> p, parser<S, SepEnd> sepend) {
   return (p >>= [=](T v) {
     return sepend >>= [=]([[maybe_unused]]
-                          typename parser_trait<SepEnd>::type _1) {
+                          typename parser_trait<SepEnd>::value_type _1) {
       return sepend_by(p, sepend) >>=
              [=](std::vector<T> vs) { vs.insert(vs.begin(), 1, v); };
     } | parser<S, std::vector<T>>::pure(v);
@@ -168,7 +178,7 @@ parser<S, std::vector<T>> sepend_by(parser<S, T> p, parser<S, SepEnd> sepend) {
 // parser `p` 0 or more times ended by end
 template <typename P, typename End,
           typename S = typename parser_trait<P>::stream_t,
-          typename T = typename parser_trait<P>::type>
+          typename T = typename parser_trait<P>::value_type>
 
 parser<S, std::vector<T>> end_by(P p, End end);
 
@@ -176,29 +186,34 @@ parser<S, std::vector<T>> end_by(P p, End end);
 template <stream::state_type S, typename T, typename End>
 parser<S, std::vector<T>> end_by1(parser<S, T> p, parser<S, End> end);
 
-// parse `p` 0 or more times  separated by sep.
-template <stream::state_type S, typename T, typename Sep>
-parser<S, std::vector<T>> sep_by(parser<S, T> p, parser<S, Sep> sep);
+// helps eliminate left recursions.
+template <stream::state_type S, typename T>
+parser<S, T> chainl1(parser<S, T> p, parser<S, std::function<T(T, T)>> op) {
+  std::function<parser<S, T>(T)> rest = [=](T x) {
+    return op >>= [=](std::function<T(T, T)> f) {
+      return p >>= [=](T y) { return rest(f(x, y)); };
+    };
+  };
+
+  return p >>= [=](T x) { return rest(x); };
+}
 
 template <stream::state_type S, typename T>
 parser<S, T> chainl(parser<S, T> p, parser<S, std::function<T(T, T)>> fn, T t);
 
 template <stream::state_type S, typename T>
-parser<S, T> chainl1(parser<S, T> p, parser<S, std::function<T(T, T)>> fn);
+parser<S, T> chainr1(parser<S, T> p, parser<S, std::function<T(T, T)>> fn);
 
 template <stream::state_type S, typename T>
 parser<S, T> chainr(parser<S, T> p, parser<S, std::function<T(T, T)>> fn, T t);
 
-template <stream::state_type S, typename T>
-parser<S, T> chainr1(parser<S, T> p, parser<S, std::function<T(T, T)>> fn);
-
-template <stream::state_type S> parser<S, std::monostate> eof;
+template <stream::state_type S> parser<S, unit> eof;
 
 template <stream::state_type S, typename T>
-parser<S, std::monostate> not_followed_by(parser<S, T> p) {
+parser<S, unit> not_followed_by(parser<S, T> p) {
   return attempt(attempt(p) >>= [=](T v) {
     // default use to_string to print the value
-    return unexpected(std::to_string(v)) | parser<S, std::monostate>::pure({});
+    return unexpected(std::to_string(v)) | parser<S, unit>::pure({});
   });
 }
 
@@ -221,16 +236,17 @@ satisfy(const std::function<bool(char)> &pred) {
 
 // parse a single character `c`
 inline parser<string_state, char> ch(char c) {
-  return satisfy([=](char o) { return o == c; });
-  // ^ std::string(1, c);
+  return satisfy([=](char o) { return o == c; }) ^
+         ("expect character: " + std::string(1, c));
 }
 
 // parse one of the character in the vector `chars`
 inline parser<string_state, char> one_of(std::vector<char> chars) {
   return satisfy([=](char c) {
-    auto iter = std::find(chars.begin(), chars.end(), c);
-    return iter == chars.end();
-  });
+           auto iter = std::find(chars.begin(), chars.end(), c);
+           return iter == chars.end();
+         }) ^
+         "oneof";
 }
 
 // parse the next character if it's not in the vector `chars`
@@ -246,7 +262,7 @@ inline parser<string_state, char> space =
     satisfy([](char c) { return isspace(c); }) ^ "space";
 
 // skip continous spaces.
-// inline parser<string_state, std::monostate> spaces =
+// inline parser<string_state, unit> spaces =
 //     skip_many<>(space) ^ "white space";
 
 // unix new line
@@ -285,15 +301,27 @@ inline parser<string_state, char> letter = alpha;
 inline parser<string_state, char> digit =
     satisfy([](char c) { return std::isdigit(c); }) ^ "digit letter";
 
+inline parser<string_state, char> nonzero =
+    satisfy([](char c) { return c > '0' && c < '9'; });
+
+inline bool ishex(char c) {
+  return c == 'a' || c == 'b' || c == 'c' || c == 'd' || c == 'e' || c == 'f' ||
+         c == 'A' || c == 'B' || c == 'C' || c == 'D' || c == 'E' || c == 'F';
+}
+
 // parse hex digits.
 inline parser<string_state, char> hex_digit =
-    (one_of({'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F'}) |
-     digit) ^
+    satisfy([](char c) { return ishex(c) || std::isdigit(c); }) ^
     "hex digit letter";
+
+inline bool isoct(char c) {
+  return c == '1' || c == '2' || c == '3' || c == '4' || c == '5' || c == '6' ||
+         c == '7' || c == '0';
+}
 
 // parse oct digits.
 inline parser<string_state, char> oct_digit =
-    (one_of({'1', '2', '3', '4', '5', '6', '7', '0'})) ^ "hex digit letter";
+    satisfy([](char c) { return isoct(c); }) ^ "hex digit letter";
 
 // parse anuy characters.
 inline parser<string_state, char> any_char = satisfy(const_(true));
