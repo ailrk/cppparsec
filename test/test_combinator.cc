@@ -66,12 +66,22 @@ TEST_CASE("character parser") {
     REQUIRE(r.get() == 123);
   }
 
-  SECTION("cons") {
+  SECTION("cons 1") {
     auto p = cons(any_char,
                   parser<string_state, std::vector<char>>::pure({'b', 'c'}));
     auto r = p(s).get();
     REQUIRE(vec_to_str(r) == "abc");
   }
+
+  // TODO
+  // // test the combination of nop + %=
+  // SECTION("cons 2") {
+  //   auto p = cons(any_char,
+  //                 zerop<string_state, unit> %= std::vector<char>{'b', 'c'});
+
+  //   auto r = p(s).get();
+  //   REQUIRE(vec_to_str(r) == "abc");
+  // }
 
   SECTION("between") {
     string_state s0("{a}");
@@ -114,7 +124,15 @@ TEST_CASE("character parser") {
     string_state s1("135a1");
     auto p = sep_by(digit, ch(','));
     auto r = p(s1).get();
-    std::cout << vec_to_str(r) << "|" << std::endl;
     REQUIRE(r.size() == 0);
   }
+}
+
+TEST_CASE("chain") {
+  using namespace cppparsec::stream;
+  using namespace cppparsec;
+  string_state s("abc\ndef\nghi\n");
+  string_state s1("123");
+
+  SECTION("chainl1 1") {}
 }

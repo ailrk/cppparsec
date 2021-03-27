@@ -264,6 +264,41 @@ TEST_CASE("bind") {
 
     REQUIRE(r == 'b');
   }
+
+  SECTION("pure at end") {
+    auto p1 = ch('a') >> ch('b') %= 'd';
+    auto r = p1(s).get();
+    REQUIRE(r == 'd');
+  }
+
+  SECTION("pure in the middle") {
+    auto p1 = (ch('a') >> ch('b') %= 'd') >> ch('c');
+    auto r = p1(s).get();
+    REQUIRE(r == 'c');
+  }
+
+  SECTION("pure in the middle") {
+    auto p1 = (ch('a') >> ch('b')) %= 1;
+    auto r = p1(s).get();
+    REQUIRE(r == 1);
+  }
+
+  SECTION("pure from nowhere 1") {
+    auto p1 = pure<string_state>(1);
+    auto p2 = pure<string_state, int>(1);
+
+    auto r = p1(s).get();
+    REQUIRE(r == 1);
+
+    r = p2(s).get();
+    REQUIRE(r == 1);
+  }
+
+  // SECTION("pure from nowhere 2") {
+  //   auto p1 = nop<string_state> %= 1;
+  //   auto r = p1(s).get();
+  //   REQUIRE(r == 1);
+  // }
 }
 
 TEST_CASE("apply") {
@@ -297,8 +332,7 @@ TEST_CASE("apply") {
 
   SECTION("apply 3") {
 
-    auto r = (p.apply(m1).apply(m2) >>=
-              []([[maybe_unused]] char v) { return PInt::pure(122); })(s);
+    auto r = (p.apply(m1).apply(m2) %= 122)(s);
     REQUIRE(r.get() == 122);
   }
 }
@@ -363,10 +397,29 @@ TEST_CASE("many related") {
   }
 
   SECTION("skip_many") {
-
-    // TODO this is broken, addr sanitizer gives me DEADLYSIGNAL error
-    auto pskip = skip_many(any_char) >> newline >> ch('d');
+    string_state s("   abc\ndef\nghi\n");
+    auto pskip = skip_many(space) >> ch('a');
     auto r = pskip(s).get();
-    std::cout << r << std::endl;
+    REQUIRE(r == 'a');
+  }
+}
+
+TEST_CASE("attempt related") {
+  using namespace cppparsec;
+  using namespace cppparsec::stream;
+
+  auto p = token<string_state, char>(printer, match);
+  string_state s("abc\ndef\nghi\n");
+
+  SECTION("attemtp 1") {
+    auto p1 = attempt(str("abd")) | str("abc");
+    auto r = p1(s).get();
+    REQUIRE(r == "abc");
+  }
+
+  SECTION("attemtp 2") {
+    auto p1 = attempt(str("abcd")) | str("abc");
+    auto r = p1(s).get();
+    REQUIRE(r == "abc");
   }
 }

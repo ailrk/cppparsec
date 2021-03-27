@@ -143,6 +143,18 @@ template <typename S, typename T> struct parser_trait<parser<S, T>> {
 template <stream::state_type S, typename T>
 static parser<S, T> make_parser(std::function<reply<S, T>(S)> transition);
 
+// free function version of pure
+template <stream::state_type S>
+
+decltype(auto) pure(auto a) {
+  using T = decltype(a);
+  return parser<S, T>([=](S state, Conts<S, T> cont) {
+    reply<S, T> r =
+        reply<S, T>::mk_empty_ok_reply(a, state, unknown_error(state));
+    return cont.empty_ok(r);
+  });
+}
+
 template <stream::state_type S, typename T> class parser {
 
 public:
@@ -182,6 +194,7 @@ public:
   static parser<S, T> pure(T a) {
     return parser([=](S state, Conts<S, T> cont) {
       reply<S, T> r =
+
           reply<S, T>::mk_empty_ok_reply(a, state, unknown_error(state));
       return cont.empty_ok(r);
     });
@@ -243,11 +256,7 @@ public:
   friend parser<S, T>
 
   operator<<(parser<S, T> p, parser<S, U> q) {
-    return p >>= [=](T v) {
-      return q >>= [v = std::move(v)]([[maybe_unused]] U _) {
-        return parser<S, T>::pure(v);
-      };
-    };
+    return p >>= [=](T v) { return q %= v; };
   }
 };
 
@@ -424,7 +433,8 @@ parser<S, T>::apply(M m) {
 
   auto p1 = *this >>= [=](T v) {
     return m >>= [=](Fn fn) { // pure
-      return parser<S, U>::pure(fn(v));
+      U u = fn(v);
+      return parser<S, U>::pure(u);
     };
   };
 
@@ -449,8 +459,8 @@ parser<S, T>
     });
 
 // Parse `m` first, if succeed, go though with the result. If failed try to
-// parse `n` with the current stream state. Note if `m` is failed and consumed
-// input, the input will not be rewind when parsing `n`.
+// parse `n` with the current stream state. Note if `m` is failed and
+// consumed input, the input will not be rewind when parsing `n`.
 template <stream::state_type S, typename T>
 parser<S, T>
 
@@ -535,7 +545,7 @@ parser<S, T>
 
 attempt(parser<S, T> p) {
 
-  return parser([p](S state, Conts<S, T> cont) {
+  return parser<S, T>([p](S state, Conts<S, T> cont) {
     return (*p.unparser)(
 
         state,
@@ -585,10 +595,12 @@ template <stream::state_type S, typename T, typename AccumFn>
 parser<S, std::vector<T>>
 
 many_accum(AccumFn fn, parser<S, T> p) {
-  static_assert(
-      std::is_convertible_v<AccumFn,
-                            std::function<std::vector<T>(T, std::vector<T>)>>,
-      "AccumFn has the wrong type");
+  static_assert(std::is_convertible_v<
+
+                    AccumFn,
+
+                    std::function<std::vector<T>(T, std::vector<T>)>>,
+                "AccumFn has the wrong type");
 
   return parser<S, std::vector<T>>([=](S state, Conts<S, std::vector<T>> cont) {
     // TODO: Now all vector are copied. handle this later.
@@ -682,14 +694,7 @@ template <typename P,
 parser<S, unit>
 
 skip_many(P p) {
-  return many(p) >> parser<S, unit>::pure({});
-  //   return many_accum(
-  //              []([[maybe_unused]] T v, [[maybe_unused]] std::vector<T> acc)
-  //              {
-  //                return std::vector<T>{};
-  //              },
-  //              p) >>
-  //          parser<S, unit>::pure({});
+  return many(p) >> pure<S>(unit{});
 }
 
 // primitive term parser.
@@ -818,6 +823,14 @@ parser<S, T>
 
 operator^(parser<S, T> p, std::string msg) {
   return label(p, {msg});
+}
+
+// short hand operator to pure a value at the end of a monadic chain.
+template <stream::state_type S, typename T, typename U>
+parser<S, U>
+
+operator%=(parser<S, T> p, U x) {
+  return p >> pure<S>(x);
 }
 
 } // namespace cppparsec
