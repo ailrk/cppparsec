@@ -1,0 +1,12 @@
+BasedOnStyle: LLVM
+Language: Cpp
+ColumnLimit: 80
+
+AllowShortLambdasOnASingleLine: Empty
+AllowShortLoopsOnASingleLine: true
+AlwaysBreakAfterReturnType: TopLevel
+AlwaysBreakTemplateDeclarations: Yes
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializers: BeforeComma
+Cpp11BracedListStyle: false
+IndentWidth: 4
