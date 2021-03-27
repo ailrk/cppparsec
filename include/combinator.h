@@ -70,19 +70,20 @@ template <stream::state_type S, typename T>
 inline parser<S, std::vector<T>>
 
 count(uint32_t n, parser<S, T> p) {
+  using Replicate =
+      std::function<parser<S, std::vector<T>>(uint32_t, std::vector<T>)>;
+
   if (n == 0) {
     return pure<S>({});
   } else {
 
-    std::function<parser<S, std::vector<T>>(uint32_t, std::vector<T>)>
-        replicate;
-
+    Replicate replicate;
     replicate = [=](uint32_t n, std::vector<T> &&acc) {
       if (n == 0) {
         return pure<S>(std::move(acc));
 
       } else {
-        return p >>= [&replicate, n, &acc](T v) {
+        return p >>= [&replicate, &acc, n](T v) {
           acc.push_back(std::move(v));
           return replicate(n - 1, acc);
         };
@@ -266,9 +267,8 @@ parser<S, T> placeholder(std::optional<parser<S, T>> p) {
   return parser<S, T>([=](S state, Conts<S, T> cont) {
     parser<S, T> p1 = p.value();
     T a = p1(state).get();
-
-    reply<S, T> r;
-    r = reply<S, T>::mk_empty_ok_reply(a, state, unknown_error(state));
+    auto err = unknown_error(state);
+    auto r = reply<S, T>::mk_empty_ok_reply(a, state, err);
     return cont.empty_ok(r);
   });
 }

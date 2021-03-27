@@ -144,61 +144,62 @@ TEST_CASE("chain") {
     std::cout << r << std::endl;
   }
 
-  // SECTION("chain 1") {
-  //   string_state s1("1*2");
-  //   auto expr = chainl1(integer, mulop);
-  //   auto r = expr(s1).get();
-  //   std::cout << r << std::endl;
-  // }
+  // TODO doesn't work
+  SECTION("chain 1") {
+    string_state s1("1*2");
+    auto expr = chainl1(integer, mulop);
+    auto r = expr(s1).get();
+    std::cout << r << std::endl;
+  }
 
-  // SECTION("chain 2") {
-  //   string_state s1("1*2*3*4");
-  //   auto expr = chainl1(integer, mulop);
-  //   auto r = expr(s1).get();
-  //   std::cout << r << std::endl;
-  // }
+  // TODO mem corrupt.
+  SECTION("chain 2") {
+    string_state s1("1*2*3*4");
+    auto expr = chainl1(integer, mulop);
+    auto r = expr(s1).get();
+    std::cout << r << std::endl;
+  }
 }
 
-// TEST_CASE("chain calculator") {
-//   using namespace cppparsec::stream;
-//   using namespace cppparsec;
-//   string_state s("abc\ndef\nghi\n");
-//   string_state s1("123");
-//   auto sym = [](std::string a) { return str(a) << spaces; };
+// TODO fix two test above first.
+TEST_CASE("chain calculator") {
+  using namespace cppparsec::stream;
+  using namespace cppparsec;
+  string_state s("abc\ndef\nghi\n");
+  string_state s1("123");
+  auto sym = [](std::string a) { return str(a) << spaces; };
 
-//   using binop = std::function<int(int, int)>;
+  using binop = std::function<int(int, int)>;
 
-//   auto mulop = (sym("*") %= binop([](int a, int b) -> int {
-//         return a * b;
-//         })) |
-//                (sym("/") %= binop([](int a, int b) -> int { return a / b;
-//                }));
+  auto mulop = (sym("*") %= binop([](int a, int b) -> int { return a * b; })) |
+               (sym("/") %= binop([](int a, int b) -> int { return a / b; }));
 
-//   auto addop = (sym("+") %= binop([](int a, int b) -> int { return a + b; }))
-//   |
-//                (sym("-") %= binop([](int a, int b) -> int { return a - b;
-//                }));
+  auto addop = (sym("+") %= binop([](int a, int b) -> int { return a + b; })) |
+               (sym("-") %= binop([](int a, int b) -> int { return a - b; }));
 
-//   auto integer =
-//       (many(digit) >>= vstr) > [](std::string n) { return std::stoi(n); };
+  auto integer =
+      (many(digit) >>= vstr) > [](std::string n) { return std::stoi(n); };
 
-//   std::optional<parser<string_state, int>> expr_;
-//   auto factor = between(sym("("), sym(")"), placeholder(expr_)) | integer;
-//   auto term = chainl1(factor, mulop);
-//   auto expr = chainl1(term, addop);
-//   expr_.emplace(expr);
+  // you can't declare without initialization in c++.
+  // To work around we wrap the uninitialized value in optional, and
+  // emplace the value after we have all definitions.
+  std::optional<parser<string_state, int>> expr_;
+  auto factor = between(sym("("), sym(")"), placeholder(expr_)) | integer;
+  auto term = chainl1(factor, mulop);
+  auto expr = chainl1(term, addop);
+  expr_.emplace(expr);
 
-//   SECTION("simple") {
-//     auto r1 = sym("a")(s).get();
-//     REQUIRE(r1 == "a");
+  SECTION("simple") {
+    auto r1 = sym("a")(s).get();
+    REQUIRE(r1 == "a");
 
-//     auto r2 = integer(s1).get();
-//     REQUIRE(r2 == 123);
-//   }
+    auto r2 = integer(s1).get();
+    REQUIRE(r2 == 123);
+  }
 
-//   SECTION("chainl1 1") {
-//     string_state s("1*2");
-//     auto r = expr(s).get();
-//     std::cout << r << std::endl;
-//   }
-//}
+  SECTION("chainl1 1") {
+    string_state s("1*2");
+    auto r = expr(s).get();
+    std::cout << r << std::endl;
+  }
+}
