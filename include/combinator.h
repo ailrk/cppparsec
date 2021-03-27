@@ -30,7 +30,6 @@ template <stream::state_type S, typename T>
 inline parser<S, std::vector<T>>
 
 cons(parser<S, T> p, parser<S, std::vector<T>> container) {
-
   return p >>= [=](T v) {
     return container >>= [=](std::vector<T> vs) {
       vs.push_back(v);
@@ -46,7 +45,6 @@ template <stream::state_type S, typename T>
 inline parser<S, std::vector<T>>
 
 snoc(parser<S, T> p, parser<S, std::vector<T>> container) {
-
   return p >>= [=](T v) {
     return container >>= [=](std::vector<T> vs) {
       vs.push_back(v);
@@ -388,13 +386,12 @@ inline bool isoct(char c) {
 // parse oct digits.
 inline parser<string_state, char>
 
-oct_digit =
-    satisfy([](char c) { return isoct(c); }) ^ "hex digit letter";
+    oct_digit = satisfy([](char c) { return isoct(c); }) ^ "hex digit letter";
 
 // parse anuy characters.
 inline parser<string_state, char>
 
-any_char = satisfy(const_(true));
+    any_char = satisfy(const_(true));
 
 // convert a vector of char to string
 inline auto vec_to_str = [](std::vector<char> v) -> std::string {

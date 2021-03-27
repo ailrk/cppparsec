@@ -19,6 +19,7 @@ namespace cppparsec {
 
 using namespace cppparsec::util;
 
+// representing the unit type.
 struct unit {};
 
 // The return type of a parser. It contains the current state (stream) and
@@ -33,11 +34,9 @@ public:
   using stream = T;
 
   bool consumed;
-
   bool ok;
 
   std::optional<T> value;
-
   S state;
 
   parser_error error;
@@ -683,12 +682,14 @@ template <typename P,
 parser<S, unit>
 
 skip_many(P p) {
-  return many_accum(
-             []([[maybe_unused]] T v, [[maybe_unused]] std::vector<T> acc) {
-               return std::vector<T>{};
-             },
-             p) >>
-         parser<S, unit>::pure({});
+  return many(p) >> parser<S, unit>::pure({});
+  //   return many_accum(
+  //              []([[maybe_unused]] T v, [[maybe_unused]] std::vector<T> acc)
+  //              {
+  //                return std::vector<T>{};
+  //              },
+  //              p) >>
+  //          parser<S, unit>::pure({});
 }
 
 // primitive term parser.
@@ -711,33 +712,39 @@ token(PrettyPrint pretty_print, Match match) {
   static_assert(std::is_convertible_v<Match, std::function<bool(V)>>,
                 "match has the wrong type");
 
-  return parser<S, T>([match, pretty_print](S state, Conts<S, T> cont) {
-    std::optional<std::tuple<V, D>> r = state.uncons(); // fetch from stream.
-    if (!r.has_value()) {
-      auto error = unexpect_error(state.get_position(), "The stream is empty");
-      return cont.empty_err(error);
-    }
+  return parser<S, T>(
 
-    auto [v, stream] = r.value(); // peek
+      [match, pretty_print]
 
-    if (match(v)) {
+      (S state, Conts<S, T> cont) {
+        std::optional<std::tuple<V, D>> r =
+            state.uncons(); // fetch from stream.
+        if (!r.has_value()) {
+          auto error =
+              unexpect_error(state.get_position(), "The stream is empty");
+          return cont.empty_err(error);
+        }
 
-      // valid token, construct a new reply with the token as it's value.
-      state = std::move(state.eat(state.next_position()));
+        auto [v, stream] = r.value(); // peek
 
-      reply<S, T> rep =
-          reply<S, T>::mk_consumed_ok_reply({v}, state, unknown_error(state));
+        if (match(v)) {
 
-      rep.value = {v};
-      rep.state = state;
-      rep.error = rep.error + unknown_error(state);
-      return cont.consumed_ok(rep);
+          // valid token, construct a new reply with the token as it's value.
+          state = std::move(state.eat(state.next_position()));
 
-    } else {
-      auto error = unexpect_error(state.get_position(), pretty_print(v));
-      return cont.empty_err(error);
-    }
-  });
+          reply<S, T> rep = reply<S, T>::mk_consumed_ok_reply(
+              {v}, state, unknown_error(state));
+
+          rep.value = {v};
+          rep.state = state;
+          rep.error = rep.error + unknown_error(state);
+          return cont.consumed_ok(rep);
+
+        } else {
+          auto error = unexpect_error(state.get_position(), pretty_print(v));
+          return cont.empty_err(error);
+        }
+      });
 }
 
 } // namespace cppparsec
