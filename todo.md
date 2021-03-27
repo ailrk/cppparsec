@@ -7,6 +7,7 @@
 
 #### last time recap
 
+2021-03-27: recursion in chainl1 doesn't work somehow
 2021-03-27: prefer trailing return types. A normal function declaration sometimes
             doesn't infer cross file.
 2021-03-27: NOTE: might be good to have a `cons` operator to cons P<T> and P<vector<T>>

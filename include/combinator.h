@@ -207,10 +207,21 @@ template <stream::state_type S, typename T>
 parser<S, T>
 
 chainl1(parser<S, T> p, parser<S, std::function<T(T, T)>> op) {
+
   std::function<parser<S, T>(T)> rest;
-  rest = [&rest, op, p](T x) {
-    return op >>= [&rest, x, p](std::function<T(T, T)> f) {
-      return p >>= [&rest, f, x](T y) { return rest(f(x, y)); };
+
+  // TODO
+  rest = [&rest, p, op](T x) {
+    return op >>= [rest, p, op, x](std::function<T(T, T)> f) {
+      std::cout << __FILE__ << " " << __LINE__ << std::endl;
+      return (p >>=
+              [rest, p, op, x, f](T y) {
+                std::cout << __FILE__ << " " << __LINE__ << std::endl;
+                std::cout << "rest is " << &rest << std::endl;
+                std::cout << "value: " << f(x, y) << std::endl;
+                return rest(f(x, y));
+              }) |
+             pure<S>(x);
     };
   };
 
@@ -255,8 +266,9 @@ parser<S, T> placeholder(std::optional<parser<S, T>> p) {
   return parser<S, T>([=](S state, Conts<S, T> cont) {
     parser<S, T> p1 = p.value();
     T a = p1(state).get();
-    reply<S, T> r =
-        reply<S, T>::mk_empty_ok_reply(a, state, unknown_error(state));
+
+    reply<S, T> r;
+    r = reply<S, T>::mk_empty_ok_reply(a, state, unknown_error(state));
     return cont.empty_ok(r);
   });
 }

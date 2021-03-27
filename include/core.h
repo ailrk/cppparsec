@@ -48,7 +48,6 @@ public:
         parser_error error)
       : consumed(consumed), ok(ok), value(value), state(state), error(error) {
 
-    // check invalid reply state.
     assert(ok ? value.has_value() : !value.has_value());
   }
 
@@ -70,8 +69,15 @@ public:
   constexpr reply<S, U>
 
   map(Fn fn) const {
-    return {consumed, ok, ok ? std::optional{fn(value.value())} : std::nullopt,
-            state, error};
+    return {
+
+        .consumed = consumed,
+        .ok = ok,
+        .value = ok ? std::optional{fn(value.value())} : std::nullopt,
+        .state = state,
+        .error = error
+
+    };
   }
 
   // make some smart constructors to avoid invalid state.
@@ -81,22 +87,54 @@ public:
   // the stream is consumed and no error occurs.
   static reply<S, T> mk_consumed_ok_reply(T value, S state,
                                           parser_error error) {
-    return {true, true, {value}, state, error};
+    return {
+
+        .consumed = true,
+        .ok = true,
+        .value = {value},
+        .state = state,
+        .error = error
+
+    };
   }
 
   // the stream is consumed and an error occurs;
   static reply<S, T> mk_consumed_err_reply(S state, parser_error error) {
-    return {true, false, {}, state, error};
+    return {
+
+        .consumed = true,
+        .ok = false,
+        .value = {},
+        .state = state,
+        .error = error
+
+    };
   }
 
   // the stream is not consumed and no error occurs.
   static reply<S, T> mk_empty_ok_reply(T value, S state, parser_error error) {
-    return {false, true, {value}, state, error};
+    return {
+
+        .consumed = false,
+        .ok = true,
+        .value = {value},
+        .state = state,
+        .error = error
+
+    };
   }
 
   // the stream is not consumed and error occurs.
   static reply<S, T> mk_empty_err_reply(S state, parser_error error) {
-    return {false, false, {}, state, error};
+    return {
+
+        .consumed = false,
+        .ok = false,
+        .value = {},
+        .state = state,
+        .error = error
+
+    };
   }
 };
 
@@ -114,7 +152,6 @@ template <stream::state_type S, typename T> struct Conts {
 
   OkContinuation<S, T> consumed_ok;
   ErrContinuation consumed_err;
-
   OkContinuation<S, T> empty_ok;
   ErrContinuation empty_err;
 };
@@ -196,6 +233,7 @@ public:
       reply<S, T> r =
 
           reply<S, T>::mk_empty_ok_reply(a, state, unknown_error(state));
+
       return cont.empty_ok(r);
     });
   }
@@ -225,9 +263,14 @@ public:
              (!r.ok && r.value == std::nullopt));
 
       if (r.consumed) {
-        r.ok ? cont.consumed_ok(r) : cont.consumed_err(r.error);
+        r.ok ? cont.consumed_ok(r)
+
+             : cont.consumed_err(r.error);
+
       } else {
-        r.ok ? cont.empty_ok(r) : cont.empty_err(r.error);
+        r.ok ? cont.empty_ok(r)
+
+             : cont.empty_err(r.error);
       }
       return r.ok;
     });
@@ -433,6 +476,7 @@ parser<S, T>::apply(M m) {
   auto p1 = *this >>= [=](T v) {
     return m >>= [=](Fn fn) { // pure
       U u = fn(v);
+
       return parser<S, U>::pure(u);
     };
   };
@@ -721,8 +765,9 @@ token(PrettyPrint pretty_print, Match match) {
       [match, pretty_print]
 
       (S state, Conts<S, T> cont) {
-        std::optional<std::tuple<V, D>> r =
-            state.uncons(); // fetch from stream.
+        // fetch from stream.
+        std::optional<std::tuple<V, D>> r = state.uncons();
+
         if (!r.has_value()) {
           auto error =
               unexpect_error(state.get_position(), "The stream is empty");
@@ -730,7 +775,6 @@ token(PrettyPrint pretty_print, Match match) {
         }
 
         auto [v, stream] = r.value(); // peek
-
         if (match(v)) {
 
           // valid token, construct a new reply with the token as it's value.
@@ -742,6 +786,7 @@ token(PrettyPrint pretty_print, Match match) {
           rep.value = {v};
           rep.state = state;
           rep.error = rep.error + unknown_error(state);
+
           return cont.consumed_ok(rep);
 
         } else {
