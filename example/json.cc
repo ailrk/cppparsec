@@ -1,4 +1,4 @@
-#include "../include/cppparsec.h"
+#include "../cppparsec/cppparsec.h"
 #include <unordered_map>
 #include <vector>
 
@@ -21,49 +21,54 @@
 using namespace cppparsec;
 using namespace cppparsec::stream;
 
-template <typename T> using P = parser<string_state, T>;
+template <typename T>
+using P = parser<string_state, T>;
 class JObject;
 class JArray;
 
 class JsonExpr {
-public:
-  virtual ~JsonExpr() = default;
+  public:
+    virtual ~JsonExpr() = default;
 };
 
 class JNull : JsonExpr {};
 
 class JValue : JsonExpr {
-  using V =
-      std::variant<std::string, float, bool, JNull, std::unique_ptr<JsonExpr>>;
-  V value;
-  JValue(V value) : value(std::move(value)){};
+    using V = std::variant<std::string, float, bool, JNull,
+                           std::unique_ptr<JsonExpr>>;
+    V value;
+    JValue(V value)
+        : value(std::move(value)){};
 };
 
 class JArray : JsonExpr {
-  std::vector<std::unique_ptr<JValue>> values;
+    std::vector<std::unique_ptr<JValue>> values;
 
-  JArray(std::vector<std::unique_ptr<JValue>> values)
-      : values(std::move(values)) {}
+    JArray(std::vector<std::unique_ptr<JValue>> values)
+        : values(std::move(values)) {}
 };
 
 class JObject : JsonExpr {
-  std::unordered_map<std::string, std::unique_ptr<JValue>> values;
+    std::unordered_map<std::string, std::unique_ptr<JValue>> values;
 
-  JObject(std::unordered_map<std::string, std::unique_ptr<JValue>> values)
-      : values(values) {}
+    JObject(std::unordered_map<std::string, std::unique_ptr<JValue>> values)
+        : values(values) {}
 };
 
 // parse values
-auto bool_p =
-    (str("true") | str("false")).map([](std::string s) { return s == "true"; });
+auto bool_p = (str("true") | str("false")).map([](std::string s) {
+    return s == "true";
+});
 
 auto int1_p = (nonzero >>= [](char n) {
-                return many(digit) >>= [=](std::vector<char> vs) {
-                  vs.push_back(n);
-                  std::rotate(vs.rbegin(), vs.rbegin() + 1, vs.rend());
-                  return parser<string_state, std::vector<char>>::pure(vs);
-                };
-              }).map([](std::vector<char> vs) { return vec_to_str(vs); });
+                  return many(digit) >>= [=](std::vector<char> vs) {
+                      vs.push_back(n);
+                      std::rotate(vs.rbegin(), vs.rbegin() + 1, vs.rend());
+                      return parser<string_state, std::vector<char>>::pure(vs);
+                  };
+              }).map([](std::vector<char> vs) {
+    return vec_to_str(vs);
+});
 
 auto int_p = str("0");
 
