@@ -1,6 +1,7 @@
 #include "catch2/catch.hpp"
 #include "cppparsec.h"
 #include <optional>
+#include <variant>
 
 // baseline test for each combinators
 
@@ -56,6 +57,18 @@ TEST_CASE("character parser") {
         auto p = str("abc");
         auto r = p(s).get();
         REQUIRE(r == "abc");
+    }
+
+    // check the end position.
+    SECTION("string space") {
+        string_state s0("abc  c");
+        auto p = str("abc") << spaces;
+        auto r = p(s0);
+        REQUIRE(r.get() == "abc");
+        REQUIRE(r.get() == "abc");
+        REQUIRE(r.state.get_position().col == 6);
+        REQUIRE(r.state.get_position().line == 1);
+        REQUIRE(r.state.get_position().index == 5);
     }
 
     SECTION("digits") {
@@ -127,6 +140,19 @@ TEST_CASE("character parser") {
     }
 }
 
+auto mult = cppparsec::binop([](int a, int b) {
+    return a * b;
+});
+auto divide = cppparsec::binop([](int a, int b) {
+    return a / b;
+});
+auto plus = cppparsec::binop([](int a, int b) {
+    return a + b;
+});
+auto minus = cppparsec::binop([](int a, int b) {
+    return a - b;
+});
+
 TEST_CASE("chain") {
     using namespace cppparsec::stream;
     using namespace cppparsec;
@@ -137,23 +163,14 @@ TEST_CASE("chain") {
         return str(a) << spaces;
     };
 
-    using binop = std::function<int(int, int)>;
+    using Binop = std::function<int(int, int)>;
 
-    auto mulop = (sym("*") %= binop([](int a, int b) -> int {
-                      return a * b;
-                  })) |
-                 (sym("/") %= binop([](int a, int b) -> int {
-                      return a / b;
-                  }));
+    auto mulop = (sym("*") %= mult) | (sym("/") %= divide);
+    auto addop = (sym("+") %= plus) | (sym("-") %= minus);
 
-    auto addop = (sym("*") %= binop([](int a, int b) -> int {
-                      return a + b;
-                  })) |
-                 (sym("/") %= binop([](int a, int b) -> int {
-                      return a - b;
-                  }));
+    auto integer = ((many(digit) >>= vtos) > stoi) << spaces;
 
-    auto integer = ((many(digit) >>= vtos) > stoi) ^ "integer";
+    using E = std::variant<int, Binop>;
 
     SECTION("simple") {
         auto r1 = sym("a")(s).get();
@@ -166,59 +183,65 @@ TEST_CASE("chain") {
         REQUIRE(r3.get() == "2");
     }
 
-    // TODO doesn't work
+    SECTION("advance") {
+        auto tup = addop >>= [=](Binop f) {
+            return integer >>= [=](int a) {
+                return pure<string_state>(std::make_tuple(E{ f }, E{ a }));
+            };
+        };
+
+        auto p = integer >>= [=](int a) {
+            return tup >>= [=](std::tuple<E, E> t) {
+                int b = a;
+                auto f = std::get<Binop>(std::get<0>(t));
+                auto y = std::get<int>(std::get<1>(t));
+                b = f(b, y);
+                return pure<string_state>(b);
+            };
+        };
+
+        int v = p(s2).get();
+        REQUIRE(v == 3);
+    }
+
     SECTION("chain 1") {
         auto expr = chainl1(integer, addop);
         auto r = expr(s2).get();
-        std::cout << r << std::endl;
+        REQUIRE(r == 3);
     }
 
-    // // TODO mem corrupt.
-    // SECTION("chain 2") {
-    //     string_state s1("1*2*3*4");
-    //     auto expr = chainl1(integer, mulop);
-    //     auto r = expr(s1).get();
-    //     std::cout << r << std::endl;
-    // }
+    SECTION("chain 2") {
+        string_state s1("1 * 2 * 3 * 4");
+        auto expr = chainl1(integer, mulop);
+        auto r = expr(s1).get();
+        REQUIRE(r == 24);
+    }
 }
 
-// // TODO fix two test above first.
-// TEST_CASE("chain calculator") {
-//     using namespace cppparsec::stream;
-//     using namespace cppparsec;
-//     string_state s("abc\ndef\nghi\n");
-//     string_state s1("123");
-//     auto sym = [](std::string a) {
-//         return str(a) << spaces;
-//     };
+TEST_CASE("chain calculator") {
+    using namespace cppparsec::stream;
+    using namespace cppparsec;
+    string_state s("abc\ndef\nghi\n");
+    string_state s1("123");
+    auto sym = [](std::string a) {
+        return str(a) << spaces;
+    };
 
-//     auto mult = binop([](int a, int b) {
-//         return a * b;
-//     });
-//     auto div = binop([](int a, int b) {
-//         return a / b;
-//     });
-//     auto plus = binop([](int a, int b) {
-//         return a + b;
-//     });
-//     auto minus = binop([](int a, int b) {
-//         return a - b;
-//     });
-//     auto mulop = (sym("*") %= mult) | (sym("/") %= div);
-//     auto addop = (sym("+") %= plus) | (sym("-") %= minus);
-//     auto integer = (many(digit) >>= vtos) > [](const std::string &str) {
-//         return std::stoi(str);
-//     };
+    auto mulop = (sym("*") %= mult) | (sym("/") %= divide);
+    auto addop = (sym("+") %= plus) | (sym("-") %= minus);
+    auto integer = (many(digit) >>= vtos) > [](const std::string &str) {
+        return std::stoi(str);
+    };
 
-//     std::optional<parser<string_state, int>> expr_;
-//     auto factor = between(sym("("), sym(")"), placeholder(expr_)) | integer;
-//     auto term = chainl1(factor, mulop);
-//     auto expr = chainl1(term, addop);
-//     expr_.emplace(expr);
+    std::optional<parser<string_state, int>> expr_;
+    auto factor = between(sym("("), sym(")"), placeholder(expr_)) | integer;
+    auto term = chainl1(factor, mulop);
+    auto expr = chainl1(term, addop);
+    expr_.emplace(expr);
 
-//     SECTION("chainl1 1") {
-//         string_state s("1*2");
-//         auto r = expr(s).get();
-//         std::cout << r << std::endl;
-//     }
-// }
+    SECTION("chainl1 1") {
+        string_state s("1 * 2");
+        auto r = expr(s).get();
+        std::cout << r << std::endl;
+    }
+}

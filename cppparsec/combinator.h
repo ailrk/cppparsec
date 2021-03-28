@@ -240,53 +240,24 @@ parser<S, T>
 chainl1(parser<S, T> p, parser<S, Binop> op) {
 
     using E = std::variant<T, Binop>;
-    auto pe = p.map([](T v) {
-        return E{ v };
-    });
-    auto ope = op.map([](Binop o) {
-        return E{ o };
-    });
 
-    auto tup = pe >>= [=](E a) {
-        return ope >>= [=](E b) {
-            return pure<S>(std::make_tuple(a, b));
+    auto tup = op >>= [=](Binop f) {
+        return p >>= [=](T a) {
+            return pure<S>(std::make_tuple(E{ f }, E{ a }));
         };
     };
 
     return p >>= [=](T x) {
         return many(tup) >>= [=](std::vector<std::tuple<E, E>> buf) {
             T b = x;
-            std::cout << "value" << x << std::endl;
             for (std::tuple<E, E> n : buf) {
                 auto f = std::get<Binop>(std::get<0>(n));
                 auto y = std::get<T>(std::get<1>(n));
-                std::cout << "y value " << y << std::endl;
                 b = f(b, y);
             }
             return pure<S>(b);
         };
     };
-
-    // auto ps = cons(pe, pure<S>(Buf{})) >>= [=, &acc](Buf acc1) {
-    //     return cons(ope, pure<S>(acc1)) >>= [=, &acc](Buf acc2) {
-    //         for (auto &v : acc2) {
-    //             acc.push_back(v);
-    //         }
-    //     };
-    // };
-
-    //     return p >>= [=](T x) {
-    //         return ps >>= [=](Buf vs) {
-    //             T b = x;
-    //             assert(vs.size() % 2 == 0);
-    //             for (size_t i = 0; i < vs.size(); i += 2) {
-    //                 T y = std::get<T>(vs[i]);
-    //                 Binop op = std::get<Binop>(vs[i + 1]);
-    //                 b = op(b, y);
-    //             }
-    //             return pure<S>(x);
-    //         };
-    //     };
 }
 
 //! parse 0 or more `p` separated by `op`, apply function in `op` on value
