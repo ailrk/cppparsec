@@ -33,10 +33,10 @@
 
 namespace cppparsec {
 
-// Four different error types.
+//! parser error types.
 enum class error_t { SysUnExpect, UnExpect, Expect, Message };
 
-// A message is a tuple of the error type and the error message.
+//! A message is a tuple of the error type and the error message.
 struct message_t {
     error_t error_kind;
     std::string text;
@@ -55,8 +55,8 @@ struct message_t {
     }
 };
 
-// A parser error maintain a vector of error messages. In parsing we are free to
-// choose to combine or discard certain message.
+//! A parser error maintain a vector of error messages. In parsing we are free
+//! to choose to combine or discard certain message.
 class parser_error {
   public:
   private:
@@ -99,10 +99,11 @@ class parser_error {
         }
     }
 
+    //! set the stream position
     void set_position(src_position pos) { position = pos; }
     src_position get_position() const { return position; }
 
-    // add new message
+    //! add new message
     void add_message(message_t message) {
         // messages.erase(std::remove(messages.begin(), messages.end(),
         // message));
@@ -113,7 +114,7 @@ class parser_error {
     // TODO pretty printing
     std::string show_error_mesage();
 
-    // show function
+    //! show parser error
     std::string to_string() const {
         std::stringstream ss;
         ss << "line: " << position.line << ", column: " << position.col << ". ";
@@ -133,42 +134,42 @@ class parser_error {
     }
 };
 
-// create a message error.
+//! create a message error.
 parser_error
 message_error(src_position position, const std::string &message) {
     auto m = message_t(error_t::Message, message);
     return parser_error(position, { m });
 }
 
-// create an unexpected error.
+//! create an unexpected error.
 parser_error
 unexpect_error(src_position position, const std::string &message) {
     auto m = message_t(error_t::UnExpect, message);
     return parser_error(position, { m });
 }
 
-// create an expected error.
+//! create an expected error.
 parser_error
 expect_error(src_position position, const std::string &message) {
     auto m = message_t(error_t::Expect, message);
     return parser_error(position, { m });
 }
 
-// create an system expected error.
+//! create an system expected error.
 parser_error
 sys_unexpect_error(src_position position, const std::string &message) {
     auto m = message_t(error_t::SysUnExpect, message);
     return parser_error(position, { m });
 }
 
-// create an unknown error.
+//! create an unknown error.
 template <stream::state_type S>
 parser_error
 unknown_error(S state) {
     return parser_error(state.get_position(), {});
 }
 
-// throw when many is used with a parser that accepts an emtpy string.
+//! throw when many is used with a parser that accepts an emtpy string.
 class bad_many_combinator : public std::exception {
 
   public:
@@ -178,9 +179,9 @@ class bad_many_combinator : public std::exception {
     }
 };
 
-// the top level exception that will only be thrown by the `get` function of
-// `reply`.
-// This exception throws all parser_error messages as formatted string.
+//! the top level exception that will only be thrown by the `get` function of
+//! `reply`.
+//! This exception throws all parser_error messages as formatted string.
 class parse_failed : public std::exception {
     std::string msg;
 

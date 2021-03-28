@@ -47,13 +47,16 @@ namespace cppparsec {
 
 using namespace cppparsec::util;
 
-// representing the unit type.
+//!
+//! representing the unit type.
+//!
 struct unit {};
 
+//!
 // The return type of a parser. It contains the current state (stream) and
 // parsed result.  `consumed` and `ok` are used to indicate the state of the
 // parser.
-
+//!
 template <stream::state_type S, typename T>
 class reply {
     // NOTE: This will be the value get passed to
@@ -75,19 +78,22 @@ class reply {
         , state()
         , error() {}
 
-    // NOTE: You should never call this directly, use smart constructors
-    // instead.
-    //
-    // Because `reply` just a struct will bunch of flags, it's possible for it
-    // to be in a state that doesn't make sense. For instance, it's not consumed
-    // by there is a value in the reply.
-    //
-    // To avoid this problem, only create new reply with four smart constructors
-    // provided in the same class, each one corresponds to a valid type of repy.
-    //
-    // Notice, you don't need to create reply manually anyway, the spirit of
-    // this library is just compose combinators, and pass the stream at the top
-    // level.
+    //!
+    //! NOTE: You should never call this directly, use smart constructors
+    //! instead.
+    //!
+    //! Because `reply` just a struct will bunch of flags, it's possible for it
+    //! to be in a state that doesn't make sense. For instance, it's not
+    //! consumed by there is a value in the reply.
+    //!
+    //! To avoid this problem, only create new reply with four smart
+    //! constructors provided in the same class, each one corresponds to a valid
+    //! type of repy.
+    //!
+    //! Notice, you don't need to create reply manually anyway, the spirit of
+    //! this library is just compose combinators, and pass the stream at the top
+    //! level.
+    //!
     reply(bool consumed, bool ok, std::optional<T> value, S state,
           parser_error error)
         : consumed(consumed)
@@ -98,8 +104,8 @@ class reply {
         assert(ok ? value.has_value() : !value.has_value());
     }
 
-    // get the result from a completed reply. If the parser failed, throw
-    // an exception with error messages.
+    //! get the result from a completed reply. If the parser failed, throw
+    //! an exception with error messages.
     T get() {
         if (value.has_value()) {
             return value.value();
@@ -108,15 +114,15 @@ class reply {
         }
     }
 
-    // merge error messages.
+    //! merge error messages.
     const reply &merge_with_error(const parser_error &new_error) {
         error = error + new_error;
         std::cerr << error.to_string() << std::endl;
         return *this;
     }
 
-    // map the value held by the reply with fn. If value is std::nullopt, this
-    // function is an nop.
+    //! map the value held by the reply with fn. If value is std::nullopt, this
+    //! function is an nop.
     template <typename Fn,
               typename U = typename function_traits<Fn>::return_type>
     constexpr reply<S, U> map(Fn fn) const {
@@ -132,23 +138,23 @@ class reply {
     // Reply with these functions, we will never have invalid Reply.  e.g an
     // empty reply with non std::nullopt value.
 
-    // the stream is consumed and no error occurs.
+    //! the stream is consumed and no error occurs.
     static reply<S, T> mk_consumed_ok_reply(T value, S state,
                                             parser_error error) {
         return { true, true, { value }, state, error };
     }
 
-    // the stream is consumed and an error occurs;
+    //! the stream is consumed and an error occurs;
     static reply<S, T> mk_consumed_err_reply(S state, parser_error error) {
         return { true, false, {}, state, error };
     }
 
-    // the stream is not consumed and no error occurs.
+    //! the stream is not consumed and no error occurs.
     static reply<S, T> mk_empty_ok_reply(T value, S state, parser_error error) {
         return { false, true, { value }, state, error };
     }
 
-    // the stream is not consumed and error occurs.
+    //! the stream is not consumed and error occurs.
     static reply<S, T> mk_empty_err_reply(S state, parser_error error) {
         return { false, false, {}, state, error };
     }
@@ -178,9 +184,9 @@ struct Conts {
     ErrContinuation empty_err;
 };
 
-// The core of a parser is essentially a function that takes a state (input
-// stream) and a bag of continuation. It try to parse the input stream, and
-// based on the result invoke the apporopirate callback.
+//! The core of a parser is essentially a function that takes a state (input
+//! stream) and a bag of continuation. It try to parse the input stream, and
+//! based on the result invoke the apporopirate callback.
 template <stream::state_type S, typename T>
 using parser_fn = std::function<bool(S, Conts<S, T>)>;
 
@@ -191,21 +197,24 @@ class parser;
 // Templated friend fcuntions need to declared somewhere.
 // | is an abelian group, * forms a monoid. Together with identity our parser
 // combinator forms a commutative ring with identity.
+
+//! alternative operator, left associative
 template <stream::state_type S, typename T>
 parser<S, T> operator|(parser<S, T>, parser<S, T>);
 
+//! sequence operator, left associative
 template <stream::state_type S, typename T>
 parser<S, T> operator*(parser<S, T>, parser<S, T>);
 
-// parser trait.
-// C++ type deduction is somewhat limited.  if we have a parameter with type `S`
-// and `T`, and return type is `parser<S, T>`, the compiler cannot induce the
-// type `parser<S, T>` based on `S`, `T` we pass in. This is very problematic
-// because it forces you to write the full type all the time.
-//
-// The solution is for all generic function, we pass the entire parser as type
-// P, and extraces its component types `S` and `T`. Although this approach makes
-// the declaration of generic funcions super verbose, but it works.
+//! parser trait.
+//! C++ type deduction is somewhat limited.  if we have a parameter with type
+//! `S` and `T`, and return type is `parser<S, T>`, the compiler cannot induce
+//! the type `parser<S, T>` based on `S`, `T` we pass in. This is very
+//! problematic because it forces you to write the full type all the time.
+//!
+//! The solution is for all generic function, we pass the entire parser as type
+//! P, and extraces its component types `S` and `T`. Although this approach
+//! makes the declaration of generic funcions super verbose, but it works.
 template <typename>
 struct parser_trait {};
 
@@ -220,8 +229,8 @@ template <stream::state_type S, typename T>
 static parser<S, T>
 make_parser(std::function<reply<S, T>(S)> transition);
 
-// Free function version for pure. We can deduce the return type by the argument
-// passed in, which is very convenient.
+//! Free function version for pure. We can deduce the return type by the
+//! argument passed in, which is very convenient.
 template <stream::state_type S>
 decltype(auto)
 pure(auto a) {
@@ -320,14 +329,16 @@ class parser {
     friend parser<S, T> operator|<>(parser<S, T>, parser<S, T>);
     friend parser<S, T> operator*<>(parser<S, T>, parser<S, T>);
 
-    // right assoicate.
+    //! map operator
+    //! right assoicate.
     template <typename Fn,
               typename U = typename function_traits<Fn>::return_type>
     parser<S, U> operator>(const Fn &fn) {
         return map(fn);
     }
 
-    // left assoicate.
+    //! bind operator
+    //! left assoicate.
     template <typename Fm,
               typename U = typename parser_trait<
                   typename function_traits<Fm>::return_type>::value_type>
@@ -335,7 +346,8 @@ class parser {
         return p.bind(fm);
     }
 
-    // right assoicate.
+    //! sequence operator
+    //! right assoicate.
     template <typename U>
     friend parser<S, U> operator>>(parser<S, T> p, parser<S, U> q) {
         return p >>= [=]([[maybe_unused]] T _) {
@@ -343,8 +355,8 @@ class parser {
         };
     }
 
-    // parse `p` and `q` consecutively, and return the value of `p`.
-    // right assoicate
+    //! parse `p` and `q` consecutively, and return the value of `p`.
+    //! right assoicate
     template <typename U>
     friend parser<S, T> operator<<(parser<S, T> p, parser<S, U> q) {
         return p >>= [=](T v) {
@@ -353,12 +365,12 @@ class parser {
     }
 };
 
-// This is the entrance of a parser. Once a parser is constructed, we can pass a
-// state to it by calling the final parser with a `state_type` complient stream.
-// Because we cps transformed the entire program, there are some overhead
-// remarks: New continuation needs to refer to the environment from the caller,
-// all of these environments needs to be kepts on the heap.  If we have a very
-// deep recursion it can use up memory.
+//! This is the entrance of a parser. Once a parser is constructed, we can pass
+//! a state to it by calling the final parser with a `state_type` complient
+//! stream. Because we cps transformed the entire program, there are some
+//! overhead remarks: New continuation needs to refer to the environment from
+//! the caller, all of these environments needs to be kepts on the heap.  If we
+//! have a very deep recursion it can use up memory.
 template <stream::state_type S, typename T>
 reply<S, T>
 parser<S, T>::operator()(const S &state) {
@@ -397,8 +409,8 @@ parser<S, T>::operator()(const S &state) {
     return r;
 }
 
-// map function T -> U into the Parser<S, T>,
-// return a new Parser<S, U>
+//! map function T -> U into the Parser<S, T>,
+//! return a new Parser<S, U>
 template <stream::state_type S, typename T>
 template <typename Fn, typename U>
 parser<S, U>
@@ -431,8 +443,8 @@ parser<S, T>::map(const Fn &fn) {
         });
 }
 
-// Monadic bind.
-// m a -> (a -> m b) -> m b
+//! Monadic bind.
+//! m a -> (a -> m b) -> m b
 template <stream::state_type S, typename T>
 template <typename Fm, typename U>
 parser<S, U>
@@ -522,14 +534,14 @@ parser<S, T>::bind(Fm fm) {
     });
 }
 
-// applicative apply. This allows we apply a function to other parsers while
-// performing the side effect.
-//
-// ```c++
-// auto p1 = pure([](int a) { return -a; });
-// int v = (p1.apply(integer))(10).get()
-// assert(v == -10);
-// ```
+//! applicative apply. This allows we apply a function to other parsers while
+//! performing the side effect.
+//!
+//! ```
+//! auto p1 = pure([](int a) { return -a; });
+//! int v = (p1.apply(integer))(10).get()
+//! assert(v == -10);
+//! ```
 template <stream::state_type S, typename T>
 template <typename M, typename Fn, typename U>
 parser<S, U>
@@ -545,7 +557,7 @@ parser<S, T>::apply(M m) {
     return p1;
 }
 
-// Identity for operator|. zerop will always fail and never consume input.
+//! Identity for operator|. zerop will always fail and never consume input.
 template <stream::state_type S, typename T>
 parser<S, T>
 
@@ -554,8 +566,8 @@ parser<S, T>
         return cont.empty_err(err);
     });
 
-// Identity for operator* open will not accept no input. This is purely for the
-// algebraic property...
+//! Identity for operator* open will not accept no input. This is purely for the
+//! algebraic property...
 template <stream::state_type S, typename T>
 parser<S, T>
 
@@ -564,12 +576,11 @@ parser<S, T>
         return cont.empty_err(err);
     });
 
-// Parse `m` first, if succeed, go though with the result. If failed try to
-// parse `n` with the current stream state. Note if `m` is failed and consumed
-// input, the input will not be rewind when parsing `n`.
-template <stream::state_type S, typename T>
-parser<S, T>
-parser<S, T>::alt(parser<S, T> n) {
+//! Parse `m` first, if succeed, go though with the result. If failed try to
+//! parse `n` with the current stream state. Note if `m` is failed and consumed
+//! input, the input will not be rewind when parsing `n`.
+te !mplate<stream::state_type S, typename T> parser<S, T> parser<S, T>::alt(
+    parser<S, T> n) {
     return parser([=, m = unparser](S state, Conts<S, T> cont) {
         // when m fails without consuming anything,
         // parse n.
@@ -638,8 +649,8 @@ operator*(parser<S, T> p, parser<S, T> q) {
 // define some core utilities.
 namespace cppparsec {
 
-// unexpected always fails with an unexpected
-// error message.
+//! unexpected always fails with an unexpected
+//! error message.
 template <stream::state_type S, typename T>
 parser<S, T>
 unexpected(std::string msg) {
@@ -649,10 +660,10 @@ unexpected(std::string msg) {
     });
 }
 
-// Rewind on failure.
-// Try parser p, if an error occurs it will rewind
-// the stream back to the previous state and
-// pretent it didn't consume anything.
+//! Rewind on failure.
+//! Try parser p, if an error occurs it will rewind
+//! the stream back to the previous state and
+//! pretent it didn't consume anything.
 template <stream::state_type S, typename T>
 parser<S, T>
 attempt(parser<S, T> p) {
@@ -675,8 +686,8 @@ attempt(parser<S, T> p) {
     });
 }
 
-// Rewind on success.  Try parser p, if success, don't consume input.  If p
-// failed and consumed some input, so does (lookAhead p).
+//! Rewind on success.  Try parser p, if success, don't consume input.  If p
+//! failed and consumed some input, so does (lookAhead p).
 template <stream::state_type S, typename T>
 parser<S, T>
 look_ahead(parser<S, T> p) {
@@ -702,7 +713,7 @@ look_ahead(parser<S, T> p) {
     });
 }
 
-// help function for applying a parser recursively.
+//! help function for applying a parser recursively.
 template <stream::state_type S, typename T, typename AccumFn>
 parser<S, std::vector<T>>
 many_accum(AccumFn fn, parser<S, T> p) {
@@ -788,7 +799,7 @@ many_accum(AccumFn fn, parser<S, T> p) {
     });
 }
 
-// parse `p` zero or more times.
+//! parse `p` zero or more times.
 template <typename P, typename S = typename parser_trait<P>::stream_t,
           typename T = typename parser_trait<P>::value_type>
 parser<S, std::vector<T>>
@@ -804,6 +815,8 @@ many(P p) {
 // TODO: now just make a new empty vector. try to
 // reuse empty acc instead. skip many and return
 // nothing.
+
+//! parsing `p` until failed
 template <typename P, typename S = typename parser_trait<P>::stream_t,
           typename T = typename parser_trait<P>::value_type>
 parser<S, unit>
@@ -811,8 +824,8 @@ skip_many(P p) {
     return many(p) >> pure<S>(unit{});
 }
 
-// primitive term parser.  Takes a customized pretty printer, because we might
-// want to use different printer or the same
+//! primitive term parser.  Takes a customized pretty printer, because we might
+//! want to use different printer or the same
 template <stream::state_type S, typename T, typename PrettyPrint,
           typename Match>
 parser<S, T>
@@ -869,7 +882,7 @@ token(PrettyPrint pretty_print, Match match) {
 
 namespace cppparsec {
 
-// Add proper number of expected errors.
+//! Add proper number of expected errors.
 static void
 add_expected_message(parser_error &error,
                      const std::vector<std::string> &msgs) {
@@ -889,14 +902,14 @@ add_expected_message(parser_error &error,
     }
 }
 
-// Replce error message with msgs. The following code snippiet failed, the
-// message "error" will show in the final error message.
-//
-// Label is the main way to achieve customized error messages.
-//
-// ```c++
-// auto parser = ch('a') ^ "error";
-// ```
+//! Replce error message with msgs. The following code snippiet failed, the
+//! message "error" will show in the final error message.
+//!
+//! Label is the main way to achieve customized error messages.
+//!
+//! ```
+//! auto parser = ch('a') ^ "error";
+//! ```
 template <stream::state_type S, typename T>
 parser<S, T>
 labels(parser<S, T> p, std::vector<std::string> msgs) {
@@ -929,24 +942,24 @@ labels(parser<S, T> p, std::vector<std::string> msgs) {
     });
 }
 
-// behave like p, but replace the error message
-// with `msg`.
+//! behave like p, but replace the error message
+//! with `msg`.
 template <stream::state_type S, typename T>
 parser<S, T>
 label(parser<S, T> p, std::string msg) {
     return labels(p, { msg });
 }
 
-// behave like p, but replace the error message
-// with `msg`.
+//! behave like p, but replace the error message
+//! with `msg`.
 template <stream::state_type S, typename T>
 parser<S, T>
 operator^(parser<S, T> p, std::string msg) {
     return label(p, { msg });
 }
 
-// short hand operator to pure a value at the end
-// of a monadic chain.
+//! short hand operator to pure a value at the end
+//! of a monadic chain.
 template <stream::state_type S, typename T, typename U>
 parser<S, U>
 operator%=(parser<S, T> p, U x) {

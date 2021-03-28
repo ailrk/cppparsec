@@ -1,0 +1,47 @@
+\hypertarget{classcppparsec_1_1parser__error}{}\doxysection{cppparsec\+::parser\+\_\+error Class Reference}
+\label{classcppparsec_1_1parser__error}\index{cppparsec::parser\_error@{cppparsec::parser\_error}}
+
+
+{\ttfamily \#include $<$error.\+h$>$}
+
+\doxysubsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classcppparsec_1_1parser__error_a1b05ce176dc7b69aa8f8b619bde70c06}\label{classcppparsec_1_1parser__error_a1b05ce176dc7b69aa8f8b619bde70c06}} 
+{\bfseries parser\+\_\+error} (const \mbox{\hyperlink{structcppparsec_1_1src__position}{src\+\_\+position}} \&position, const Messages \&messages)
+\item 
+\mbox{\Hypertarget{classcppparsec_1_1parser__error_a8b39e0aa8bbda3ca4c7676d08801b7f9}\label{classcppparsec_1_1parser__error_a8b39e0aa8bbda3ca4c7676d08801b7f9}} 
+bool {\bfseries empty} ()
+\item 
+\mbox{\Hypertarget{classcppparsec_1_1parser__error_a9b17ff8949089f73cdc78abe067c27fb}\label{classcppparsec_1_1parser__error_a9b17ff8949089f73cdc78abe067c27fb}} 
+bool {\bfseries is\+\_\+unknown\+\_\+error} ()
+\item 
+\mbox{\Hypertarget{classcppparsec_1_1parser__error_a9531d933f11d4016113367301e5cdc85}\label{classcppparsec_1_1parser__error_a9531d933f11d4016113367301e5cdc85}} 
+void \mbox{\hyperlink{classcppparsec_1_1parser__error_a9531d933f11d4016113367301e5cdc85}{set\+\_\+position}} (\mbox{\hyperlink{structcppparsec_1_1src__position}{src\+\_\+position}} pos)
+\begin{DoxyCompactList}\small\item\em set the stream position \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classcppparsec_1_1parser__error_ab51039ef4bd954f01ccc3910056a480f}\label{classcppparsec_1_1parser__error_ab51039ef4bd954f01ccc3910056a480f}} 
+\mbox{\hyperlink{structcppparsec_1_1src__position}{src\+\_\+position}} {\bfseries get\+\_\+position} () const
+\item 
+\mbox{\Hypertarget{classcppparsec_1_1parser__error_a482c99c57fcbb2396a9f3e97d777bb84}\label{classcppparsec_1_1parser__error_a482c99c57fcbb2396a9f3e97d777bb84}} 
+void \mbox{\hyperlink{classcppparsec_1_1parser__error_a482c99c57fcbb2396a9f3e97d777bb84}{add\+\_\+message}} (\mbox{\hyperlink{structcppparsec_1_1message__t}{message\+\_\+t}} message)
+\begin{DoxyCompactList}\small\item\em add new message \end{DoxyCompactList}\item 
+\mbox{\Hypertarget{classcppparsec_1_1parser__error_ae050ec7960d362d4a1bfeb2e1b2089bf}\label{classcppparsec_1_1parser__error_ae050ec7960d362d4a1bfeb2e1b2089bf}} 
+std\+::string {\bfseries show\+\_\+error\+\_\+mesage} ()
+\item 
+\mbox{\Hypertarget{classcppparsec_1_1parser__error_a031bb5ce3e5118f4ae6c278e3078c6b4}\label{classcppparsec_1_1parser__error_a031bb5ce3e5118f4ae6c278e3078c6b4}} 
+std\+::string \mbox{\hyperlink{classcppparsec_1_1parser__error_a031bb5ce3e5118f4ae6c278e3078c6b4}{to\+\_\+string}} () const
+\begin{DoxyCompactList}\small\item\em show parser error \end{DoxyCompactList}\end{DoxyCompactItemize}
+\doxysubsection*{Friends}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{classcppparsec_1_1parser__error_a38b4f2622403fb67b379085e0b306bc7}\label{classcppparsec_1_1parser__error_a38b4f2622403fb67b379085e0b306bc7}} 
+\mbox{\hyperlink{classcppparsec_1_1parser__error}{parser\+\_\+error}} {\bfseries operator+} (const \mbox{\hyperlink{classcppparsec_1_1parser__error}{parser\+\_\+error}} \&e1, const \mbox{\hyperlink{classcppparsec_1_1parser__error}{parser\+\_\+error}} \&e2)
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+A parser error maintain a vector of error messages. In parsing we are free to choose to combine or discard certain message. 
+
+The documentation for this class was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+include/error.\+h\end{DoxyCompactItemize}

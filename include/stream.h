@@ -36,9 +36,9 @@
 
 namespace cppparsec {
 
-// Position can't change itself. it can only be updated by String.
-// the reason is Position doesn't have information about what character
-// it's rading, so it doesn't know if it need to increment col or line.
+//! Position can't change itself. it can only be updated by String.
+//! the reason is Position doesn't have information about what character
+//! it's rading, so it doesn't know if it need to increment col or line.
 struct src_position {
     size_t line;
     size_t col;
@@ -208,8 +208,8 @@ string_state::get_position() const {
     return *position;
 }
 
-// the next position after taken n elements.
-// when n =  0 return the same position;
+//! the next position after taken n elements.
+//! when n =  0 return the same position;
 src_position
 string_state::next_position(size_t n) const {
     if (is_empty() && n == 0) {
@@ -235,7 +235,7 @@ string_state::next_position() const {
     return next_position(1);
 }
 
-// Return the first element and the rest stream.
+//! return the first element and the rest stream.
 std::optional<std::tuple<char, std::string_view>>
 string_state::uncons() const {
     if (is_empty()) {
@@ -244,8 +244,8 @@ string_state::uncons() const {
     return std::make_tuple(data.at(0), data.substr(1));
 }
 
-// Eat the next n tokens, and return a new StringStream with
-// updated position.
+//! eat the next n tokens, and return a new StringStream with
+//! updated position.
 string_state
 string_state::eat(size_t n) const {
     if (n == 0 || n > data.size()) {
@@ -255,8 +255,8 @@ string_state::eat(size_t n) const {
     }
 }
 
-// given a new position, eat until the current position is the same as the
-// new position.
+//! given a new position, eat until the current position is the same as the
+//! new position.
 string_state
 string_state::eat(const src_position &target_position) const {
     // accumulator
