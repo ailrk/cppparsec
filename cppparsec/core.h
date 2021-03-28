@@ -579,8 +579,9 @@ parser<S, T>
 //! Parse `m` first, if succeed, go though with the result. If failed try to
 //! parse `n` with the current stream state. Note if `m` is failed and consumed
 //! input, the input will not be rewind when parsing `n`.
-te !mplate<stream::state_type S, typename T> parser<S, T> parser<S, T>::alt(
-    parser<S, T> n) {
+template <stream::state_type S, typename T>
+parser<S, T>
+parser<S, T>::alt(parser<S, T> n) {
     return parser([=, m = unparser](S state, Conts<S, T> cont) {
         // when m fails without consuming anything,
         // parse n.

@@ -185,20 +185,20 @@ TEST_CASE("chain calculator") {
 
     using binop = std::function<int(int, int)>;
 
-    auto mulop = (sym("*") %= binop([](int a, int b) -> int {
-                      return a * b;
-                  })) |
-                 (sym("/") %= binop([](int a, int b) -> int {
-                      return a / b;
-                  }));
-
-    auto addop = (sym("+") %= binop([](int a, int b) -> int {
-                      return a + b;
-                  })) |
-                 (sym("-") %= binop([](int a, int b) -> int {
-                      return a - b;
-                  }));
-
+    auto mult = binop([](int a, int b) -> int {
+        return a * b;
+    });
+    auto div = binop([](int a, int b) -> int {
+        return a / b;
+    });
+    auto plus = binop([](int a, int b) -> int {
+        return a + b;
+    });
+    auto minus = binop([](int a, int b) -> int {
+        return a - b;
+    });
+    auto mulop = (sym("*") %= mult) | (sym("/") %= div);
+    auto addop = (sym("+") %= plus) | (sym("-") %= minus);
     auto integer = (many(digit) >>= vstr) > [](std::string n) {
         return std::stoi(n);
     };
