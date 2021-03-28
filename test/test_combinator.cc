@@ -153,6 +153,23 @@ auto minus = cppparsec::binop([](int a, int b) {
     return a - b;
 });
 
+TEST_CASE("placeholder") {
+    using namespace cppparsec::stream;
+    using namespace cppparsec;
+    string_state s("123");
+
+    SECTION("placeholder 1") {
+        std::optional<parser<string_state, int>> p;
+        auto integer = ((many(digit) >>= vtos) > stoi) << spaces;
+        auto ph = placeholder(&p);
+        p.emplace(integer);
+        std::cout << "p has value?" << p.has_value() << std::endl;
+
+        auto r = ph(s).get();
+        REQUIRE(r == 123);
+    }
+}
+
 TEST_CASE("chain") {
     using namespace cppparsec::stream;
     using namespace cppparsec;
@@ -221,27 +238,22 @@ TEST_CASE("chain") {
 TEST_CASE("chain calculator") {
     using namespace cppparsec::stream;
     using namespace cppparsec;
-    string_state s("abc\ndef\nghi\n");
-    string_state s1("123");
     auto sym = [](std::string a) {
         return str(a) << spaces;
     };
 
-    auto mulop = (sym("*") %= mult) | (sym("/") %= divide);
-    auto addop = (sym("+") %= plus) | (sym("-") %= minus);
-    auto integer = (many(digit) >>= vtos) > [](const std::string &str) {
-        return std::stoi(str);
-    };
-
+    auto mulop = attempt(sym("*") %= mult) | (sym("/") %= divide);
+    auto addop = attempt(sym("+") %= plus) | (sym("-") %= minus);
+    auto integer = ((many(digit) >>= vtos) > stoi) << spaces;
     std::optional<parser<string_state, int>> expr_;
-    auto factor = between(sym("("), sym(")"), placeholder(expr_)) | integer;
+    auto factor = between(sym("("), sym(")"), placeholder(&expr_)) | integer;
     auto term = chainl1(factor, mulop);
     auto expr = chainl1(term, addop);
     expr_.emplace(expr);
 
     SECTION("chainl1 1") {
-        string_state s("1 * 2");
+        string_state s("20 * 2 + 3 * 10");
         auto r = expr(s).get();
-        std::cout << r << std::endl;
+        REQUIRE(r == 70);
     }
 }

@@ -251,9 +251,14 @@ chainl1(parser<S, T> p, parser<S, Binop> op) {
         return many(tup) >>= [=](std::vector<std::tuple<E, E>> buf) {
             T b = x;
             for (std::tuple<E, E> n : buf) {
-                auto f = std::get<Binop>(std::get<0>(n));
-                auto y = std::get<T>(std::get<1>(n));
-                b = f(b, y);
+                // if binop and value are not in the right order, just skip.
+                try {
+                    auto f = std::get<Binop>(std::get<0>(n));
+                    auto y = std::get<T>(std::get<1>(n));
+                    b = f(b, y);
+                } catch (std::bad_variant_access e) {
+                    continue;
+                }
             }
             return pure<S>(b);
         };
@@ -312,9 +317,9 @@ many_till(parser<S, T> p, parser<S, End> end);
 //! ```
 template <stream::state_type S, typename T>
 parser<S, T>
-placeholder(std::optional<parser<S, T>> p) {
+placeholder(std::optional<parser<S, T>> *p) {
     return parser<S, T>([=](S state, conts_t<S, T> cont) {
-        parser<S, T> p1 = p.value();
+        parser<S, T> p1 = p->value();
         T a = p1(state).get();
         auto err = unknown_error(state);
         auto r = reply<S, T>::mk_empty_ok_reply(a, state, err);
