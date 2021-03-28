@@ -28,6 +28,7 @@
 #include "core.h"
 #include "stream.h"
 #include <algorithm>
+#include <any>
 #include <deque>
 #include <functional>
 #include <numeric>
@@ -143,9 +144,8 @@ maybe(parser<S, T> p) {
 }
 
 //! parse any token.
-template <stream::state_type S, typename T, typename End>
-parser<S, std::vector<T>>
-any_token(parser<S, T> p);
+template <stream::state_type S>
+parser<S, std::any> any_token;
 
 //! skip at least 1 and return nothing.
 template <stream::state_type S, typename T>
@@ -270,7 +270,9 @@ chainl1(parser<S, T> p, parser<S, Binop> op) {
 //! Return default value t if there are no `p`.
 template <stream::state_type S, typename T>
 parser<S, T>
-chainl(parser<S, T> p, parser<S, std::function<T(T, T)>> fn, T t);
+chainl(parser<S, T> p, parser<S, std::function<T(T, T)>> op, T t) {
+    return chainl1(p, op) | pure<S>(t);
+}
 
 //! parse 0 or more `p` separated by `op`, apply function in `op` on value
 //! returned by `p` in a right fold fasion.
@@ -285,10 +287,6 @@ template <stream::state_type S, typename T>
 parser<S, T>
 chainr(parser<S, T> p, parser<S, std::function<T(T, T)>> fn, T t);
 
-//! parse the end of file.
-template <stream::state_type S>
-parser<S, unit> eof;
-
 //! proceed when parser `p` fails.
 template <stream::state_type S, typename T>
 parser<S, unit>
@@ -298,6 +296,10 @@ not_followed_by(parser<S, T> p) {
         return unexpected(std::to_string(v)) | parser<S, unit>::pure({});
     });
 }
+
+//! parse the end of file.
+template <stream::state_type S>
+parser<S, unit> eof = not_followed_by(any_token<S>) ^ "end of input";
 
 //! try keep parsing `p` until the first occurence of `end`
 template <stream::state_type S, typename T, typename End>
@@ -465,9 +467,7 @@ ishex(char c) {
            c == 'E' || c == 'F';
 }
 
-//!
 //! parse hex digits.
-//!
 inline parser<string_state, char> hex_digit =
     satisfy([](char c) {
         return ishex(c) || std::isdigit(c);

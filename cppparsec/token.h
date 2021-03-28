@@ -56,7 +56,7 @@ struct language_def_s {
 using language_def = language_def_s<stream::string_state>;
 
 template <stream::state_type S>
-struct TokenParserS {
+struct token_parser_s {
     parser<S, std::string> identifier;
 
     parser<S, std::monostate> reserved;

@@ -987,7 +987,7 @@ operator^(parser<S, T> p, const std::string &msg) {
 //!   p %= 1;
 //! ```
 //! is equivalent to the following
-//
+//!
 //! ```
 //!   p >>= []([[maybe_unused]] int v) {
 //!      return pure<string_state>(1);
