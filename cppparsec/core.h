@@ -239,7 +239,7 @@ struct parser_trait<lazy_parser<S, T>> {
 //! is ambiguos, add the type as the second template paramter to guide the type
 //! checker.
 template <stream::state_type S>
-CPPPARSEC_INLINE decltype(auto)
+CPPPARSEC_API CPPPARSEC_INLINE decltype(auto)
 pure(auto a) {
     using T = decltype(a);
     return parser<S, T>([=](S state, const conts_t<S, T> &cont) {
@@ -254,7 +254,7 @@ pure(auto a) {
 //! passed, it will construct an empty lazy parser, and it must be emplaced
 //! before being used. Thisis useful when dealing with recursive definitions.
 template <stream::state_type S>
-CPPPARSEC_INLINE decltype(auto)
+CPPPARSEC_API CPPPARSEC_INLINE decltype(auto)
 lpure(auto a) {
     using T = decltype(a);
     return parser<S, T>([=](S state, const conts_t<S, T> &cont) {
@@ -271,7 +271,7 @@ lpure(auto a) {
 //!   lp.emplace(pure<string(1)>);
 //! ```
 template <stream::state_type S, typename T>
-CPPPARSEC_INLINE decltype(auto)
+CPPPARSEC_API CPPPARSEC_INLINE decltype(auto)
 lpure() {
     return lazy_parser<S, T>();
 }
@@ -281,7 +281,7 @@ lpure() {
 //! each copy of a `parser` will increase the reference count of the underlying
 //! `parser_fn`.
 template <stream::state_type S, typename T>
-class parser {
+class parser CPPPARSEC_API {
   public:
     using reply_t = reply<S, T>;
     using value_type = T;
@@ -423,7 +423,7 @@ class parser {
 //! lazy parser is a parser that can be empty by default. It's useful when
 //! handling recursive definitions.
 template <stream::state_type S, typename T>
-class lazy_parser : public parser<S, T> {
+class lazy_parser CPPPARSEC_API : public parser<S, T> {
     std::optional<parser<S, T>> thunk;
 
   public:

@@ -21,11 +21,15 @@ auto mulop = (sym("*") %= mult)
            | (sym("/") %= div);
 auto addop = (sym("+") %= add)
            | (sym("-") %= minus);
+
+// declaration for recursive definition.
+CPPP_DECL(expr, string_state, int);
 auto integer = (many(digit) >>= vtos) > stoi;
 auto factor = between(sym("("), sym(")"), expr)
             | integer;
 auto term = chainl1(factor, mulop);
-auto expr = chainl1(term, addop);
+expr = chainl1(term, addop);
+
 int result = expr(s).get();
 assert(result == 11);
 ```
