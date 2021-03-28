@@ -38,6 +38,10 @@
 #include <variant>
 #include <vector>
 
+//! this macro is used to delcare parsers without initializing them. More
+//! details is at `lazy_parser` section.
+#define CPPP_DECL(name, s_typ, v_typ) auto name = lpure<s_typ, v_typ>();
+
 namespace cppparsec {
 
 //! try a vector of parser until succeed.

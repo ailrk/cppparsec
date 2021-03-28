@@ -276,14 +276,6 @@ lpure() {
     return lazy_parser<S, T>();
 }
 
-//! create an empty lazy parser with a lambda that initialize the parser on
-//! demand.
-template <stream::state_type S, typename T>
-CPPPARSEC_INLINE decltype(auto)
-lpure(const std::function<parser<S, T>()> &ctor) {
-    return lazy_parser<S, T>(ctor);
-}
-
 //! a parser is a wrapper over a `shared_ptr` to the `parser_fn` with the type
 //! `std::function<bool(S, const conts_t<S, T> &)>`
 //! each copy of a `parser` will increase the reference count of the underlying
@@ -433,34 +425,28 @@ class parser {
 template <stream::state_type S, typename T>
 class lazy_parser : public parser<S, T> {
     std::optional<parser<S, T>> thunk;
-    std::optional<std::function<parser<S, T>()>> ctor;
 
   public:
     lazy_parser()
-        : thunk()
-        , ctor() {}
+        : thunk() {}
 
-    lazy_parser(std::function<parser<S, T>()> ctor)
-        : thunk()
-        , ctor(ctor) {}
+    lazy_parser(const lazy_parser &) = default;
+    lazy_parser(lazy_parser &&) = default;
 
     lazy_parser &operator=(const parser<S, T> &other) {
         emplace(other);
         return *this;
     }
+
     lazy_parser &operator=(parser<S, T> &&other) {
         emplace(std::move(other));
         return *this;
     }
 
-    //     lazy_parser &operator=(const lazy_parser<S, T> &other) = default;
-    //     lazy_parser &operator=(lazy_parser<S, T> &&other) = default;
-
     //! construct the parser hold in thunk. The constructed `parser_fn` will
     //! be swaped into the lazy_parser. After swapping, the value in the thunk
     //! will be reset.
     void emplace(auto... args) {
-
         thunk.emplace(std::forward<decltype(args)...>(args)...);
 
         CPPPARSEC_TRY { this->swap(thunk.value()); }
@@ -470,9 +456,6 @@ class lazy_parser : public parser<S, T> {
     }
 
     reply<S, T> operator()(const S &state) {
-        if (ctor.has_value() && !thunk.has_value()) {
-            emplace(ctor.value());
-        }
 
         return parser<S, T>::operator()(state);
     }
