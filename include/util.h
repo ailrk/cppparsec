@@ -1,3 +1,4 @@
+// This file defines some utilities for cppparsec.
 #pragma once
 #include <functional>
 #include <utility>

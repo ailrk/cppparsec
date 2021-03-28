@@ -1,3 +1,28 @@
+// cppparsec
+// Copyright © 2021 ailrk
+
+// Permission is hereby granted, free of charge, to any person obtaining
+// a copy of this software and associated documentation files (the "Software"),
+// to deal in the Software without restriction, including without limitation
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,
+// and/or sell copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+// IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+// TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+// OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/* This file defines some commonly used  parser combinators. The first sectons
+ * contains generic combinators, and the second section defines combinators
+ * specialized for string.
+ * */
 #pragma once
 #include "core.h"
 #include "stream.h"
@@ -13,9 +38,9 @@
 
 namespace cppparsec {
 
+// try a vector of parser until succeed.
 template <stream::state_type S, typename T>
 inline parser<S, T>
-
 choice(std::vector<parser<S, T>> options) {
     parser<S, T> result = zerop<S, T>;
     for (auto &o : options) {
@@ -43,7 +68,6 @@ cons(parser<S, T> p, parser<S, std::vector<T>> container) {
 // `container`
 template <stream::state_type S, typename T>
 inline parser<S, std::vector<T>>
-
 snoc(parser<S, T> p, parser<S, std::vector<T>> container) {
     return p >>= [=](T v) {
         return container >>= [=](std::vector<T> vs) {
@@ -56,7 +80,6 @@ snoc(parser<S, T> p, parser<S, std::vector<T>> container) {
 // convert a vector of parsers into a parser that return a vector.
 template <stream::state_type S, typename T>
 inline parser<S, std::vector<T>>
-
 collect(std::vector<parser<S, T>> ps) {
     auto r = parser<S, std::vector<T>>::pure({});
     for (auto iter = ps.rbegin(); iter != ps.rend(); ++iter) {
@@ -66,9 +89,9 @@ collect(std::vector<parser<S, T>> ps) {
     return r;
 }
 
+// count the number of times parser `p` succeed.
 template <stream::state_type S, typename T>
 inline parser<S, std::vector<T>>
-
 count(uint32_t n, parser<S, T> p) {
     using Replicate =
         std::function<parser<S, std::vector<T>>(uint32_t, std::vector<T>)>;
@@ -91,10 +114,10 @@ count(uint32_t n, parser<S, T> p) {
     }
 }
 
+// parse `o`, `c`, `p` in order and return the value of `c`.
 template <typename P, typename Open, typename Close,
           typename S = typename parser_trait<P>::stream_t,
           typename T = typename parser_trait<P>::value_type>
-
 inline parser<S, T>
 between(Open o, Close c, P p) {
     return o >> (p >>= [=](T v) {
@@ -118,6 +141,7 @@ maybe(parser<S, T> p) {
     }));
 }
 
+// parse any token.
 template <stream::state_type S, typename T, typename End>
 parser<S, std::vector<T>>
 any_token(parser<S, T> p);
@@ -140,7 +164,6 @@ many1(parser<S, T> p) {
 template <typename P, typename Sep,
           typename S = typename parser_trait<P>::stream_t,
           typename T = typename parser_trait<P>::value_type>
-
 parser<S, std::vector<T>>
 sep_by1(P p, Sep sep) {
     return cons(p, many1(sep >> p));
@@ -150,12 +173,13 @@ sep_by1(P p, Sep sep) {
 template <typename P, typename Sep,
           typename S = typename parser_trait<P>::stream_t,
           typename T = typename parser_trait<P>::value_type>
-
 parser<S, std::vector<T>>
 sep_by(P p, Sep sep) {
     return attempt(sep_by1(p, sep)) | pure<S>(std::vector<T>{});
 }
 
+// parse `p` 0 or more times separated by `sepend`. It's also optional to end
+// with a `sepend`.
 template <stream::state_type S, typename T, typename SepEnd>
 parser<S, std::vector<T>>
 sepend_by(parser<S, T> p, parser<S, SepEnd> sepend);
@@ -184,15 +208,17 @@ sepend_by(parser<S, T> p, parser<S, SepEnd> sepend) {
 template <typename P, typename End,
           typename S = typename parser_trait<P>::stream_t,
           typename T = typename parser_trait<P>::value_type>
-
 parser<S, std::vector<T>>
 end_by(P p, End end);
+
 // parser `p` 1 or more times ended by end
 template <stream::state_type S, typename T, typename End>
 parser<S, std::vector<T>>
-
 end_by1(parser<S, T> p, parser<S, End> end);
-// helps eliminate left recursions.
+
+// parse 0 or more `p` separated by `op`, apply function in `op` on value
+// returned by `p` in a left fold fasion.
+// chainl1 can be useful to eliminate left recursion.
 template <stream::state_type S, typename T>
 parser<S, T>
 chainl1(parser<S, T> p, parser<S, std::function<T(T, T)>> op) {
@@ -219,21 +245,31 @@ chainl1(parser<S, T> p, parser<S, std::function<T(T, T)>> op) {
     };
 }
 
+// parse 0 or more `p` separated by `op`, apply function in `op` on value
+// returned by `p` in a left fold fasion.
+// Return default value t if there are no `p`.
 template <stream::state_type S, typename T>
 parser<S, T>
 chainl(parser<S, T> p, parser<S, std::function<T(T, T)>> fn, T t);
 
+// parse 0 or more `p` separated by `op`, apply function in `op` on value
+// returned by `p` in a right fold fasion.
 template <stream::state_type S, typename T>
 parser<S, T>
 chainr1(parser<S, T> p, parser<S, std::function<T(T, T)>> fn);
 
+// parse 0 or more `p` separated by `op`, apply function in `op` on value
+// returned by `p` in a right fold fasion.
+// Return default value t if there are no `p`.
 template <stream::state_type S, typename T>
 parser<S, T>
 chainr(parser<S, T> p, parser<S, std::function<T(T, T)>> fn, T t);
 
+// parse the end of file.
 template <stream::state_type S>
 parser<S, unit> eof;
 
+// proceed when parser `p` fails.
 template <stream::state_type S, typename T>
 parser<S, unit>
 not_followed_by(parser<S, T> p) {
@@ -243,11 +279,22 @@ not_followed_by(parser<S, T> p) {
     });
 }
 
+// try keep parsing `p` until the first occurence of `end`
 template <stream::state_type S, typename T, typename End>
 parser<S, std::vector<T>>
 many_till(parser<S, T> p, parser<S, End> end);
 
 // handling recursive definitions.
+// Because we can't declare without initialization in c++, it's tricky to have
+// recursive definition. To walk around, we wrap the uninitialized value in
+// optional, and emplace the value after we have all definitions.
+// ```c++
+//   std::optional<parser<string_state, int>> expr_;
+//   auto factor = between(sym("("), sym(")"), placeholder(expr_)) | integer;
+//   auto term = chainl1(factor, mulop);
+//   auto expr = chainl1(term, addop);
+//   expr_.emplace(expr);
+// ```
 template <stream::state_type S, typename T>
 parser<S, T>
 placeholder(std::optional<parser<S, T>> p) {
@@ -391,7 +438,7 @@ inline parser<string_state, char>
         return c > '0' && c < '9';
     });
 
-inline bool
+static inline bool
 ishex(char c) {
     return c == 'a' || c == 'b' || c == 'c' || c == 'd' || c == 'e' ||
            c == 'f' || c == 'A' || c == 'B' || c == 'C' || c == 'D' ||
@@ -405,7 +452,7 @@ inline parser<string_state, char> hex_digit =
     }) ^
     "hex digit letter";
 
-inline bool
+static inline bool
 isoct(char c) {
     return c == '1' || c == '2' || c == '3' || c == '4' || c == '5' ||
            c == '6' || c == '7' || c == '0';
@@ -429,6 +476,11 @@ inline auto vec_to_str = [](std::vector<char> v) -> std::string {
     return std::string(v.begin(), v.end());
 };
 
+} // namespace cppparsec
+
+// helper monanic functions
+namespace cppparsec {
+
 // convert a parser of char vector to a parser of string.
 inline auto vstr =
     [](std::vector<char> cs) -> parser<string_state, std::string> {
@@ -440,12 +492,10 @@ inline auto str = [](std::string s) -> parser<string_state, std::string> {
     if (s == "") {
         return pure<string_state, std::string>("");
     }
-
     std::vector<parser<string_state, char>> chparsers;
     for (auto &c : s) {
         chparsers.push_back(ch(c));
     }
-
     return collect(chparsers).map([](std::vector<char> charvec) {
         return vec_to_str(charvec);
     });

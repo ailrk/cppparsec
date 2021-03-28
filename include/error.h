@@ -1,3 +1,26 @@
+// cppparsec
+// Copyright © 2021 ailrk
+
+// Permission is hereby granted, free of charge, to any person obtaining
+// a copy of this software and associated documentation files (the "Software"),
+// to deal in the Software without restriction, including without limitation
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,
+// and/or sell copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+// IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+// TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+// OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/* This file defines utilities to represent errors in parser combinators.
+ * */
 #include "stream.h"
 #include <algorithm>
 #include <concepts>
@@ -9,8 +32,10 @@
 
 namespace cppparsec {
 
+// Four different error types.
 enum class error_t { SysUnExpect, UnExpect, Expect, Message };
 
+// A message is a tuple of the error type and the error message.
 struct message_t {
     error_t error_kind;
     std::string text;
@@ -29,6 +54,8 @@ struct message_t {
     }
 };
 
+// A parser error maintain a vector of error messages. In parsing we are free to
+// choose to combine or discard certain message.
 class parser_error {
   public:
   private:
@@ -39,7 +66,7 @@ class parser_error {
 
   public:
     parser_error()
-        : position(src_position{ 1, 1, 0 })
+        : position(src_position{ 1, 1, 0 }) // default position
         , messages() {}
     parser_error(const src_position &position, const Messages &messages)
         : position(position)
@@ -49,7 +76,7 @@ class parser_error {
     bool empty() { return messages.empty(); }
     bool is_unknown_error() { return empty(); }
 
-    // merge errors to get a new error.
+    // merge two errors to get a new error.
     friend parser_error operator+(const parser_error &e1,
                                   const parser_error &e2) {
         if (!e1.messages.empty() && e2.messages.empty()) {
@@ -105,30 +132,35 @@ class parser_error {
     }
 };
 
+// create a message error.
 parser_error
 message_error(src_position position, const std::string &message) {
     auto m = message_t(error_t::Message, message);
     return parser_error(position, { m });
 }
 
+// create an unexpected error.
 parser_error
 unexpect_error(src_position position, const std::string &message) {
     auto m = message_t(error_t::UnExpect, message);
     return parser_error(position, { m });
 }
 
+// create an expected error.
 parser_error
 expect_error(src_position position, const std::string &message) {
     auto m = message_t(error_t::Expect, message);
     return parser_error(position, { m });
 }
 
+// create an system expected error.
 parser_error
 sys_unexpect_error(src_position position, const std::string &message) {
     auto m = message_t(error_t::SysUnExpect, message);
     return parser_error(position, { m });
 }
 
+// create an unknown error.
 template <stream::state_type S>
 parser_error
 unknown_error(S state) {
@@ -145,6 +177,9 @@ class bad_many_combinator : public std::exception {
     }
 };
 
+// the top level exception that will only be thrown by the `get` function of
+// `reply`.
+// This exception throws all parser_error messages as formatted string.
 class parse_failed : public std::exception {
     std::string msg;
 
