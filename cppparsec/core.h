@@ -99,13 +99,16 @@ class reply {
 
     //! get the result from a completed reply. If the parser failed, throw
     //! an exception with error messages.
-    T get() {
+    T get() const {
         if (value.has_value()) {
             return value.value();
         } else {
             throw parse_failed(error.to_string());
         }
     }
+
+    //! non const get.
+    T get() { return const_cast<T>(const_cast<const reply *>(this)->get()); }
 
     //! merge error messages.
     const reply &merge_with_error(const parser_error &new_error) {
@@ -120,8 +123,7 @@ class reply {
               typename U = typename function_traits<Fn>::return_type>
     constexpr reply<S, U> map(Fn fn) const {
         if (ok) {
-            return { consumed, ok, std::optional{ fn(value.value()) }, state,
-                     error };
+            return { consumed, ok, std::optional{ fn(get()) }, state, error };
         } else {
             return { consumed, ok, std::nullopt, state, error };
         }
@@ -218,14 +220,10 @@ struct parser_trait<parser<S, T>> {
     using stream_t = typename parser<S, T>::stream_t;
 };
 
-template <stream::state_type S, typename T>
-static parser<S, T>
-make_parser(std::function<reply<S, T>(S)> transition);
-
 //! Free function version for pure. We can deduce the return type by the
 //! argument passed in, which is very convenient.
 template <stream::state_type S>
-decltype(auto)
+inline decltype(auto)
 pure(auto a) {
     using T = decltype(a);
     return parser<S, T>([=](S state, const conts_t<S, T> &cont) {
@@ -411,7 +409,8 @@ parser<S, T>::operator()(const S &state) {
 }
 
 //! map function T -> U into the Parser<S, T>,
-//! return a new Parser<S, U>
+//! return a new parser<S, U>
+//! note: this function is also provded by `operator>()`
 template <stream::state_type S, typename T>
 template <typename Fn, typename U>
 parser<S, U>
@@ -446,6 +445,8 @@ parser<S, T>::map(const Fn &fn) {
 
 //! Monadic bind.
 //! m a -> (a -> m b) -> m b
+//! note: this function is also provded by `operator>>=()`
+//!       the sequence version is provided by `operator>>()`
 template <stream::state_type S, typename T>
 template <typename Fm, typename U>
 parser<S, U>
@@ -474,8 +475,10 @@ parser<S, T>::bind(Fm fm) {
                 return cont.consumed_err(error);
             };
 
-            // call parser.
-            parser<S, U> m = fm(rep.value.value());
+            // grab the parser.
+            // calling get here, so if there is error it will throw
+            // `parse_failed`
+            parser<S, U> m = fm(rep.get());
             return (*m.unparser)(
 
                 rep.state,
@@ -507,7 +510,7 @@ parser<S, T>::bind(Fm fm) {
                 return cont.empty_err(e);
             };
 
-            parser<S, U> m = fm(rep.value.value());
+            parser<S, U> m = fm(rep.get());
             return (*m.unparser)(
 
                 rep.state,
@@ -551,6 +554,7 @@ parser<S, T>::apply(M m) {
         return m >>= [=](Fn fn) { // pure
             U u = fn(v);
 
+            // note: must use this overload for some reason.
             return parser<S, U>::pure(u);
         };
     };
@@ -740,7 +744,7 @@ many_accum(AccumFn fn, parser<S, T> p) {
                 {
 
                     .consumed_ok = [&walk, &fn, &acc](reply<S, T> rep) -> bool {
-                        auto v = rep.value.value();
+                        auto v = rep.get();
                         fn(v, acc);
                         walk(acc, rep);
                         return rep.ok;
@@ -828,8 +832,8 @@ skip_many(P p) {
     return many(p) >> pure<S>(unit{});
 }
 
-//! primitive term parser.  Takes a customized pretty printer, because we might
-//! want to use different printer or the same
+//! primitive term parser. token allows customized pretty printer, and matcher.
+//! token is the only parser that eat the stream and move the parser forward.
 template <stream::state_type S, typename T, typename PrettyPrint,
           typename Match>
 parser<S, T>
@@ -858,6 +862,10 @@ token(PrettyPrint pretty_print, Match match) {
             }
 
             auto [v, stream] = r.value(); // peek
+
+            // only accpet matched token, unmatched tokens are considered error.
+            // matach is provided as a callback so you can customize the
+            // behavior of the term parser.
             if (match(v)) {
                 // valid token, construct a new reply
                 // with the token as it's value.
