@@ -1,4 +1,4 @@
-# cppparsec
+# [cppparsec](cppparsec)
 
 A monadic parser combinator library for c++.
 
@@ -8,7 +8,6 @@ A monadic parser combinator library for c++.
 A quick example for making a calculator.
 
 ```c++
-
 #include "cppparsec.h"
 using namespace cppparsec;
 
@@ -22,7 +21,7 @@ auto mulop = (sym("*") %= mult)
            | (sym("/") %= div);
 auto addop = (sym("+") %= add)
            | (sym("-") %= minus);
-auto integer = (many(digit) >>= vstr) > stoi;
+auto integer = (many(digit) >>= vtos) > stoi;
 auto factor = between(sym("("), sym(")"), expr)
             | integer;
 auto term = chainl1(factor, mulop);

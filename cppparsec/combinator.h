@@ -234,30 +234,59 @@ unop(Fn fn) {
 //! parse 0 or more `p` separated by `op`, apply function in `op` on value
 //! returned by `p` in a left fold fasion.
 //! chainl1 can be useful to eliminate left recursion.
-template <stream::state_type S, typename T>
+template <stream::state_type S, typename T,
+          typename Binop = std::function<T(T, T)>>
 parser<S, T>
-chainl1(parser<S, T> p, parser<S, std::function<T(T, T)>> op) {
+chainl1(parser<S, T> p, parser<S, Binop> op) {
 
-    std::function<parser<S, T>(T)> rest;
+    using E = std::variant<T, Binop>;
+    auto pe = p.map([](T v) {
+        return E{ v };
+    });
+    auto ope = op.map([](Binop o) {
+        return E{ o };
+    });
 
-    // TODO
-    rest = [&rest, p, op](T x) {
-        return op >>= [rest, p, op, x](std::function<T(T, T)> f) {
-            std::cout << __FILE__ << " " << __LINE__ << std::endl;
-            return (p >>=
-                    [rest, p, op, x, f](T y) {
-                        std::cout << __FILE__ << " " << __LINE__ << std::endl;
-                        std::cout << "rest is " << &rest << std::endl;
-                        std::cout << "value: " << f(x, y) << std::endl;
-                        return rest(f(x, y));
-                    }) |
-                   pure<S>(x);
+    auto tup = pe >>= [=](E a) {
+        return ope >>= [=](E b) {
+            return pure<S>(std::make_tuple(a, b));
         };
     };
 
     return p >>= [=](T x) {
-        return rest(x);
+        return many(tup) >>= [=](std::vector<std::tuple<E, E>> buf) {
+            T b = x;
+            std::cout << "value" << x << std::endl;
+            for (std::tuple<E, E> n : buf) {
+                auto f = std::get<Binop>(std::get<0>(n));
+                auto y = std::get<T>(std::get<1>(n));
+                std::cout << "y value " << y << std::endl;
+                b = f(b, y);
+            }
+            return pure<S>(b);
+        };
     };
+
+    // auto ps = cons(pe, pure<S>(Buf{})) >>= [=, &acc](Buf acc1) {
+    //     return cons(ope, pure<S>(acc1)) >>= [=, &acc](Buf acc2) {
+    //         for (auto &v : acc2) {
+    //             acc.push_back(v);
+    //         }
+    //     };
+    // };
+
+    //     return p >>= [=](T x) {
+    //         return ps >>= [=](Buf vs) {
+    //             T b = x;
+    //             assert(vs.size() % 2 == 0);
+    //             for (size_t i = 0; i < vs.size(); i += 2) {
+    //                 T y = std::get<T>(vs[i]);
+    //                 Binop op = std::get<Binop>(vs[i + 1]);
+    //                 b = op(b, y);
+    //             }
+    //             return pure<S>(x);
+    //         };
+    //     };
 }
 
 //! parse 0 or more `p` separated by `op`, apply function in `op` on value
@@ -507,7 +536,7 @@ inline auto stoi = [](const std::string &str) {
 };
 
 //! convert a parser of char vector to a parser of string.
-inline auto vstr =
+inline auto vtos =
     [](const std::vector<char> &cs) -> parser<string_state, std::string> {
     return pure<string_state>(vec_to_str(cs));
 };

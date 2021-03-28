@@ -114,7 +114,7 @@ TEST_CASE("character parser") {
 
     SECTION("sep by1") {
         string_state s1("1,2,3");
-        auto p = sep_by1(digit, ch(',')) >>= vstr;
+        auto p = sep_by1(digit, ch(',')) >>= vtos;
         auto r = p(s1).get();
         REQUIRE(r == "123");
     }
@@ -132,6 +132,7 @@ TEST_CASE("chain") {
     using namespace cppparsec;
     string_state s("abc\ndef\nghi\n");
     string_state s1("123");
+    string_state s2("1 + 2");
     auto sym = [](std::string a) {
         return str(a) << spaces;
     };
@@ -145,22 +146,32 @@ TEST_CASE("chain") {
                       return a / b;
                   }));
 
-    auto integer = (many(digit) >>= vstr) > stoi;
+    auto addop = (sym("*") %= binop([](int a, int b) -> int {
+                      return a + b;
+                  })) |
+                 (sym("/") %= binop([](int a, int b) -> int {
+                      return a - b;
+                  }));
 
-    // SECTION("chain 0") {
-    //     string_state s1("1");
-    //     auto expr = chainl1(integer, mulop);
-    //     auto r = expr(s1).get();
-    //     std::cout << r << std::endl;
-    // }
+    auto integer = ((many(digit) >>= vtos) > stoi) ^ "integer";
 
-    // // TODO doesn't work
-    // SECTION("chain 1") {
-    //     string_state s1("1*2");
-    //     auto expr = chainl1(integer, mulop);
-    //     auto r = expr(s1).get();
-    //     std::cout << r << std::endl;
-    // }
+    SECTION("simple") {
+        auto r1 = sym("a")(s).get();
+        REQUIRE(r1 == "a");
+
+        auto r2 = integer(s1).get();
+        REQUIRE(r2 == 123);
+
+        auto r3 = (sym("1") >> sym("+") >> sym("2"))(s2);
+        REQUIRE(r3.get() == "2");
+    }
+
+    // TODO doesn't work
+    SECTION("chain 1") {
+        auto expr = chainl1(integer, addop);
+        auto r = expr(s2).get();
+        std::cout << r << std::endl;
+    }
 
     // // TODO mem corrupt.
     // SECTION("chain 2") {
@@ -195,7 +206,7 @@ TEST_CASE("chain") {
 //     });
 //     auto mulop = (sym("*") %= mult) | (sym("/") %= div);
 //     auto addop = (sym("+") %= plus) | (sym("-") %= minus);
-//     auto integer = (many(digit) >>= vstr) > [](const std::string &str) {
+//     auto integer = (many(digit) >>= vtos) > [](const std::string &str) {
 //         return std::stoi(str);
 //     };
 
@@ -204,14 +215,6 @@ TEST_CASE("chain") {
 //     auto term = chainl1(factor, mulop);
 //     auto expr = chainl1(term, addop);
 //     expr_.emplace(expr);
-
-//     SECTION("simple") {
-//         auto r1 = sym("a")(s).get();
-//         REQUIRE(r1 == "a");
-
-//         auto r2 = integer(s1).get();
-//         REQUIRE(r2 == 123);
-//     }
 
 //     SECTION("chainl1 1") {
 //         string_state s("1*2");

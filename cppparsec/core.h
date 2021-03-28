@@ -99,16 +99,13 @@ class reply {
 
     //! get the result from a completed reply. If the parser failed, throw
     //! an exception with error messages.
-    T get() const {
+    T &get() {
         if (value.has_value()) {
             return value.value();
         } else {
             throw parse_failed(error.to_string());
         }
     }
-
-    //! non const get.
-    T get() { return const_cast<T>(const_cast<const reply *>(this)->get()); }
 
     //! merge error messages.
     const reply &merge_with_error(const parser_error &new_error) {
@@ -121,7 +118,7 @@ class reply {
     //! function is an nop.
     template <typename Fn,
               typename U = typename function_traits<Fn>::return_type>
-    constexpr reply<S, U> map(Fn fn) const {
+    constexpr reply<S, U> map(Fn fn) {
         if (ok) {
             return { consumed, ok, std::optional{ fn(get()) }, state, error };
         } else {
@@ -189,7 +186,7 @@ struct conts_t {
 //! stream) and a bag of continuation. It try to parse the input stream, and
 //! based on the result invoke the apporopirate callback.
 template <stream::state_type S, typename T>
-using parser_fn = std::function<bool(S, const conts_t<S, T> &)>;
+using parser_fn = std::function<bool(S, conts_t<S, T>)>;
 
 template <stream::state_type S, typename T>
 class parser;
