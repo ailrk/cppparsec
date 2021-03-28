@@ -162,20 +162,26 @@ using ok_cont = std::function<bool(const reply<S, T> &)>;
 
 using err_cont = std::function<bool(parser_error)>;
 
-// We have four different continuations for four possible parser states, each
-// callback corresponding to one specific state of the reply.
-//
-// 1. consumed_ok: The stream was consumed and the last parser was succeed.
-// 2. consumed_err: The stream was consumed but the last parser was failed.
-// 3. empty_ok: The stream was not consumed but it's consided as a success.
-// 4. empty_err: The stream was not consumed and it's considered as a failure.
-//
-// This is how we handle errors and back traces.
+//! We have four different continuations for four possible parser states, each
+//! callback corresponding to one specific state of the reply.
+//!
+//! This is how we handle errors and back traces.
 template <stream::state_type S, typename T>
 struct conts_t {
+    //! the callback will be invoked by the parser if the stream was consumed
+    //! and the last parser was succeed.
     ok_cont<S, T> consumed_ok;
+
+    //! the callback will be invoked by the parser if the stream was consumed
+    //! but the last parser was failed.
     err_cont consumed_err;
+
+    //! the callback will be invoked by the parser if the stream was not
+    //! consumed but it's consided as a success.
     ok_cont<S, T> empty_ok;
+
+    //! the callback will be invoked by the parser if the stream was not
+    //! consumed and it's considered as a failure.
     err_cont empty_err;
 };
 
@@ -220,8 +226,11 @@ struct parser_trait<parser<S, T>> {
     using stream_t = typename parser<S, T>::stream_t;
 };
 
-//! Free function version for pure. We can deduce the return type by the
-//! argument passed in, which is very convenient.
+//! Lift a value into the parser.
+//! The return type is deduced from the parameter get passed in, so the only
+//! required template parameter is the stream type. If the type of the parameter
+//! is ambiguos, add the type as the second template paramter to guide the type
+//! checker.
 template <stream::state_type S>
 inline decltype(auto)
 pure(auto a) {
@@ -233,6 +242,10 @@ pure(auto a) {
     });
 }
 
+//! a parser is a wrapper over a `shared_ptr` to the `parser_fn` with the type
+//! `std::function<bool(S, const conts_t<S, T> &)>`
+//! each copy of a `parser` will increase the reference count of the underlying
+//! `parser_fn`.
 template <stream::state_type S, typename T>
 class parser {
   public:
@@ -278,6 +291,7 @@ class parser {
 
     reply<S, T> operator()(const S &state);
 
+    //! Lift a value into a parser.
     static parser<S, T> pure(T a) {
         return parser([=](S state, const conts_t<S, T> &cont) {
             auto r =
@@ -852,7 +866,7 @@ token(PrettyPrint pretty_print, Match match) {
     return parser<S, T>(
 
         [match, pretty_print](S state, const conts_t<S, T> &cont) {
-            // fetch from stream.
+            // fetch from the stream.
             std::optional<std::tuple<V, D>> r = state.uncons();
 
             if (!r.has_value()) {
@@ -970,8 +984,19 @@ operator^(parser<S, T> p, const std::string &msg) {
     return label(p, { msg });
 }
 
-//! short hand operator to pure a value at the end
-//! of a monadic chain.
+//! quick pure.
+//! The code below:
+//! ```
+//!   p %= 1;
+//! ```
+//! is equivalent to the following
+//
+//! ```
+//!   p >>= []([[maybe_unused]] int v) {
+//!      return pure<string_state>(1);
+//!   };
+//!
+//! ```
 template <stream::state_type S, typename T, typename U>
 parser<S, U>
 operator%=(parser<S, T> p, U x) {

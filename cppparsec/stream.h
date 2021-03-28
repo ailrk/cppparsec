@@ -188,28 +188,32 @@ static_assert(sizeof(string_state) == 24,
               "StringState is too large. It should only contain a string_view "
               "and an unique_ptr to the position");
 
+//! check if the stream is empty.
 bool
 string_state::is_empty() const {
     return data.size() == 0;
 }
 
+//! get current line
 size_t
 string_state::get_line() const {
     return position->line;
 }
 
+//! get current column.
 size_t
 string_state::get_col() const {
     return position->col;
 }
 
+//! get position of the stream.
 src_position
 string_state::get_position() const {
     return *position;
 }
 
-//! the next position after taken n elements.
-//! when n =  0 return the same position;
+//! get the next position after taken n elements,
+//! when n =  0 return the same position.
 src_position
 string_state::next_position(size_t n) const {
     if (is_empty() && n == 0) {
@@ -230,6 +234,7 @@ string_state::next_position(size_t n) const {
     return new_position;
 }
 
+//! get the next position after taken 1 element.
 src_position
 string_state::next_position() const {
     return next_position(1);
@@ -271,6 +276,7 @@ string_state::eat(const src_position &target_position) const {
     return res.eat(distance);
 }
 
+//! eat one element.
 string_state
 string_state::eat() const {
     return eat(1);
