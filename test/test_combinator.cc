@@ -234,27 +234,27 @@ TEST_CASE("chain") {
     }
 }
 
-// TEST_CASE("chain calculator") {
-//     using namespace cppparsec::stream;
-//     using namespace cppparsec;
+TEST_CASE("chain calculator") {
+    using namespace cppparsec::stream;
+    using namespace cppparsec;
 
-//     SECTION("chainl1 1") {
-//         auto sym = [](std::string a) {
-//             return str(a) << spaces;
-//         };
+    SECTION("chainl1 1") {
+        auto sym = [](std::string a) {
+            return str(a) << spaces;
+        };
 
-//         auto mulop = attempt(sym("*") %= mult) | (sym("/") %= divide);
-//         auto addop = attempt(sym("+") %= plus) | (sym("-") %= minus);
-//         auto integer = ((many(digit) >>= vtos) > stoi) << spaces;
+        auto mulop = attempt(sym("*") %= mult) | (sym("/") %= divide);
+        auto addop = attempt(sym("+") %= plus) | (sym("-") %= minus);
+        auto integer = ((many(digit) >>= vtos) > stoi) << spaces;
 
-//         auto expr = lpure<string_state, int>();
+        auto expr = lpure<string_state, int>();
 
-//         auto factor = between(sym("("), sym(")"), expr) | integer;
-//         auto term = chainl1(factor, mulop);
-//         expr.emplace(chainl1(term, addop));
+        auto factor = between(sym("("), sym(")"), expr) | integer;
+        auto term = chainl1(factor, mulop);
+        expr = chainl1(term, addop);
 
-//         string_state s("20 * 2 + 3 * 10");
-//         auto r = expr(s).get();
-//         REQUIRE(r == 70);
-//     }
-// }
+        string_state s("20 * 2 + 3 * 10");
+        auto r = expr(s).get();
+        REQUIRE(r == 70);
+    }
+}

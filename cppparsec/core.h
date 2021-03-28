@@ -249,9 +249,10 @@ pure(auto a) {
     });
 }
 
-//! equivalence of pure, but create lazy parser instead. If no argument passed,
-//! lpur will construct an empty lazy parser, and it must be emplaced before
-//! being used. Thisis useful when dealing with recursive definitions.
+//! equivalence of pure, but create lazy parser instead. If an argument is
+//! passed, lpure will create a normal parser and initialize it. If no argument
+//! passed, it will construct an empty lazy parser, and it must be emplaced
+//! before being used. Thisis useful when dealing with recursive definitions.
 template <stream::state_type S>
 CPPPARSEC_INLINE decltype(auto)
 lpure(auto a) {
@@ -264,10 +265,23 @@ lpure(auto a) {
 }
 
 //! create an empty lazy parser.
+//! possible use case;
+//! ```
+//!   auto lp = lpure<string_state, int>();
+//!   lp.emplace(pure<string(1)>);
+//! ```
 template <stream::state_type S, typename T>
 CPPPARSEC_INLINE decltype(auto)
 lpure() {
     return lazy_parser<S, T>();
+}
+
+//! create an empty lazy parser with a lambda that initialize the parser on
+//! demand.
+template <stream::state_type S, typename T>
+CPPPARSEC_INLINE decltype(auto)
+lpure(const std::function<parser<S, T>()> &ctor) {
+    return lazy_parser<S, T>(ctor);
 }
 
 //! a parser is a wrapper over a `shared_ptr` to the `parser_fn` with the type
@@ -414,20 +428,56 @@ class parser {
     }
 };
 
+//! lazy parser is a parser that can be empty by default. It's useful when
+//! handling recursive definitions.
 template <stream::state_type S, typename T>
 class lazy_parser : public parser<S, T> {
     std::optional<parser<S, T>> thunk;
+    std::optional<std::function<parser<S, T>()>> ctor;
 
   public:
     lazy_parser()
-        : thunk() {}
+        : thunk()
+        , ctor() {}
 
+    lazy_parser(std::function<parser<S, T>()> ctor)
+        : thunk()
+        , ctor(ctor) {}
+
+    lazy_parser &operator=(const parser<S, T> &other) {
+        emplace(other);
+        return *this;
+    }
+    lazy_parser &operator=(parser<S, T> &&other) {
+        emplace(std::move(other));
+        return *this;
+    }
+
+    //     lazy_parser &operator=(const lazy_parser<S, T> &other) = default;
+    //     lazy_parser &operator=(lazy_parser<S, T> &&other) = default;
+
+    //! construct the parser hold in thunk. The constructed `parser_fn` will
+    //! be swaped into the lazy_parser. After swapping, the value in the thunk
+    //! will be reset.
     void emplace(auto... args) {
+
         thunk.emplace(std::forward<decltype(args)...>(args)...);
+
         CPPPARSEC_TRY { this->swap(thunk.value()); }
         CPPPARSEC_CATCH(std::bad_optional_access e) { return; }
-        thunk.reset();
+
+        thunk.reset(); // good bye!
     }
+
+    reply<S, T> operator()(const S &state) {
+        if (ctor.has_value() && !thunk.has_value()) {
+            emplace(ctor.value());
+        }
+
+        return parser<S, T>::operator()(state);
+    }
+    //! a synonym of emplace
+    void set(auto... args) { emplace(forward<args...>(args)...); }
 };
 
 //! This is the entrance of a parser. Once a parser is constructed, we can pass
