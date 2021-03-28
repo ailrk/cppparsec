@@ -103,7 +103,7 @@ class reply {
         if (value.has_value()) {
             return value.value();
         } else {
-            throw parse_failed(error.to_string());
+            CPPPARSEC_THROW(parse_failed(error.to_string()));
         }
     }
 
@@ -118,7 +118,7 @@ class reply {
     //! function is an nop.
     template <typename Fn,
               typename U = typename function_traits<Fn>::return_type>
-    constexpr reply<S, U> map(Fn fn) {
+    CPPPARSEC_CONSTEXPR reply<S, U> map(Fn fn) {
         if (ok) {
             return { consumed, ok, std::optional{ fn(get()) }, state, error };
         } else {
@@ -229,7 +229,8 @@ struct parser_trait<parser<S, T>> {
 //! is ambiguos, add the type as the second template paramter to guide the type
 //! checker.
 template <stream::state_type S>
-CPPPARSEC_INLINE decltype(auto)
+CPPPARSEC_INLINE
+decltype(auto)
 pure(auto a) {
     using T = decltype(a);
     return parser<S, T>([=](S state, const conts_t<S, T> &cont) {

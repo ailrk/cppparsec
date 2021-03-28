@@ -163,7 +163,6 @@ TEST_CASE("placeholder") {
         auto integer = ((many(digit) >>= vtos) > stoi) << spaces;
         auto ph = placeholder(&p);
         p.emplace(integer);
-        std::cout << "p has value?" << p.has_value() << std::endl;
 
         auto r = ph(s).get();
         REQUIRE(r == 123);

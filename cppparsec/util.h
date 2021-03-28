@@ -1,4 +1,26 @@
-// This file defines some utilities for cppparsec.
+// cppparsec
+// Copyright © 2021 ailrk
+
+// Permission is hereby granted, free of charge, to any person obtaining
+// a copy of this software and associated documentation files (the "Software"),
+// to deal in the Software without restriction, including without limitation
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,
+// and/or sell copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+// IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+// TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+// OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+/* This file defines some utilities for cppparsec.
+ */
 #pragma once
 #include <functional>
 #include <utility>
@@ -9,6 +31,15 @@ namespace cppparsec::util {
 #define CONCAT_(x, y) x##y
 #define CONCAT (x, y) CONCAT_(x, y)
 #define GENSYM (x) CONCAT(x, __COUNTER__)
+
+// constexpr options.
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
+#define CPPPARSEC_NOEXCEPT _NOEXCEPT
+#define CPPPARSEC_CONSTEXPR
+#else
+#define CPPPARSEC_NOEXCEPT noexcept
+#define CPPPARSEC_CONSTEXPR constexpr
+#endif
 
 // export options.
 #ifdef CPPPARSEC_COMPILED_LIB
@@ -46,11 +77,14 @@ namespace cppparsec::util {
         fprintf(stderr, "cppparsec fatal error: %s\n", ex.what());             \
         std::abort();                                                          \
     } while (0)
+
+#define CPPPARSEC_CATCH(ex)
 #define CPPPARSEC_CATCH_ALL()
 #else
 #define CPPPARSEC_TRY try
 #define CPPPARSEC_THROW(ex) throw(ex)
 #define CPPPARSEC_CATCH_ALL() catch (...)
+#define CPPPARSEC_CATCH(ex) catch (ex)
 #endif
 
 // some template stuffs

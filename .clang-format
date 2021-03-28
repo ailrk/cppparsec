@@ -10,3 +10,5 @@ BreakBeforeTernaryOperators: true
 BreakConstructorInitializers: BeforeComma
 Cpp11BracedListStyle: false
 IndentWidth: 4
+MacroBlockEnd: "CPPPARSEC_API"
+MacroBlockEnd: "CPPPARSEC_INLINE"
