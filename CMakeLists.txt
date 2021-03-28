@@ -20,7 +20,7 @@ add_library(cppparsec INTERFACE)
 add_library(cppparsec::cppparsec ALIAS cppparsec)
 target_include_directories(cppparsec INTERFACE
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>)
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/cppparsec>)
 
 if (CPPPARSEC_BUILD_FUZZER AND CPPPARSEC_BUILD_TEST)
   message(FATAL_ERROR

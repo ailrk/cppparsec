@@ -9,7 +9,7 @@ endif()
 
 
 # include header
-include_directories(${cppparsec_SOURCE_DIR}/include)
+include_directories(${cppparsec_SOURCE_DIR}/cppparsec)
 link_directories(${cppparsec_BINARY_DIR}/lib)
 
 # include catch2

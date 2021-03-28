@@ -1,0 +1,50 @@
+\hypertarget{structcppparsec_1_1src__position}{}\doxysection{cppparsec\+::src\+\_\+position Struct Reference}
+\label{structcppparsec_1_1src__position}\index{cppparsec::src\_position@{cppparsec::src\_position}}
+
+
+{\ttfamily \#include $<$stream.\+h$>$}
+
+\doxysubsection*{Public Member Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{structcppparsec_1_1src__position_af2b3d0ac1b418a5187777e5676b775ad}\label{structcppparsec_1_1src__position_af2b3d0ac1b418a5187777e5676b775ad}} 
+std\+::string {\bfseries to\+\_\+string} ()
+\end{DoxyCompactItemize}
+\doxysubsection*{Public Attributes}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{structcppparsec_1_1src__position_ae81344f9d674e5c9391a1b24c96d679d}\label{structcppparsec_1_1src__position_ae81344f9d674e5c9391a1b24c96d679d}} 
+size\+\_\+t {\bfseries line}
+\item 
+\mbox{\Hypertarget{structcppparsec_1_1src__position_accd233e3e014e5e527c0997b2e9d6476}\label{structcppparsec_1_1src__position_accd233e3e014e5e527c0997b2e9d6476}} 
+size\+\_\+t {\bfseries col}
+\item 
+\mbox{\Hypertarget{structcppparsec_1_1src__position_a550ec6ff016fb76b3e082a0187133343}\label{structcppparsec_1_1src__position_a550ec6ff016fb76b3e082a0187133343}} 
+size\+\_\+t {\bfseries index}
+\end{DoxyCompactItemize}
+\doxysubsection*{Friends}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{structcppparsec_1_1src__position_ae7950df58ec9987ffe7a416f9ce6a75e}\label{structcppparsec_1_1src__position_ae7950df58ec9987ffe7a416f9ce6a75e}} 
+int {\bfseries operator-\/} (const \mbox{\hyperlink{structcppparsec_1_1src__position}{src\+\_\+position}} \&p1, const \mbox{\hyperlink{structcppparsec_1_1src__position}{src\+\_\+position}} \&p2)
+\item 
+\mbox{\Hypertarget{structcppparsec_1_1src__position_a230fd015340dc16ac2bb84da2c7fd0d1}\label{structcppparsec_1_1src__position_a230fd015340dc16ac2bb84da2c7fd0d1}} 
+bool {\bfseries operator$<$} (const \mbox{\hyperlink{structcppparsec_1_1src__position}{src\+\_\+position}} \&p1, const \mbox{\hyperlink{structcppparsec_1_1src__position}{src\+\_\+position}} \&p2)
+\item 
+\mbox{\Hypertarget{structcppparsec_1_1src__position_a4acf9ef8ad69ccc3fde823d9606ddf37}\label{structcppparsec_1_1src__position_a4acf9ef8ad69ccc3fde823d9606ddf37}} 
+bool {\bfseries operator$>$} (const \mbox{\hyperlink{structcppparsec_1_1src__position}{src\+\_\+position}} \&p1, const \mbox{\hyperlink{structcppparsec_1_1src__position}{src\+\_\+position}} \&p2)
+\item 
+\mbox{\Hypertarget{structcppparsec_1_1src__position_a784d05863f4e31b4d6cbee820bf83ba3}\label{structcppparsec_1_1src__position_a784d05863f4e31b4d6cbee820bf83ba3}} 
+bool {\bfseries operator==} (const \mbox{\hyperlink{structcppparsec_1_1src__position}{src\+\_\+position}} \&p1, const \mbox{\hyperlink{structcppparsec_1_1src__position}{src\+\_\+position}} \&p2)
+\item 
+\mbox{\Hypertarget{structcppparsec_1_1src__position_af6c4454630d34148f2d51d282543d754}\label{structcppparsec_1_1src__position_af6c4454630d34148f2d51d282543d754}} 
+bool {\bfseries operator!=} (const \mbox{\hyperlink{structcppparsec_1_1src__position}{src\+\_\+position}} \&p1, const \mbox{\hyperlink{structcppparsec_1_1src__position}{src\+\_\+position}} \&p2)
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+Position can\textquotesingle{}t change itself. it can only be updated by String. the reason is Position doesn\textquotesingle{}t have information about what character it\textquotesingle{}s rading, so it doesn\textquotesingle{}t know if it need to increment col or line. 
+
+The documentation for this struct was generated from the following file\+:\begin{DoxyCompactItemize}
+\item 
+/home/jimmy/new\+Disk/\+Repo/cppparsec/include/stream.\+h\end{DoxyCompactItemize}
