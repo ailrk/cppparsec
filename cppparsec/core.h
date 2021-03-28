@@ -251,17 +251,25 @@ class parser {
     //
     // 1. It will be very wasteful if we copy both p1 to p2.
     // 2. If we pass by reference we will lose intermediate parser in a long
-    //    expression. e.g p = p1.map(f1).map(f2); the parser created by
-    //    p1.map(f1) lives till the end of the statement.
+    //    expression.
+    //    e.g
+    //      auto p = p1.map(f1).map(f2);
+    //      p(s);
+    //    this code will case a dangling reference, because the parser created
+    //    by p1.map(f1) lives till the end of the statement.
+    //
     // 3. If we move p1 into p2 we can't use it as a
     //    standalone parser anymore. shared_ptr helps
     //    solve problems above. The whole parser is
     //    just a wrapper over the shared_ptr, copy
     //    Parser will copy 16 bytes.
+    //    e.g
+    //      auto p = p1.map(f1).map(f2);
+    //      p1(s);
+    //    This also gives you dangling referece.
     //
-    // Continuation and shared ptr unparser are
-    // implementation details, and you should never
-    // need to interact with them direclty.
+    // Continuation and shared ptr unparser are implementation details, and you
+    // should never need to interact with them direclty.
     std::shared_ptr<parser_fn<S, T>> unparser;
 
     parser(const parser_fn<S, T> &parse)
