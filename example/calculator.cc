@@ -6,12 +6,15 @@ using namespace cppparsec;
 auto mult = cppparsec::binop([](int a, int b) {
     return a * b;
 });
+
 auto divide = cppparsec::binop([](int a, int b) {
     return a / b;
 });
+
 auto plus = cppparsec::binop([](int a, int b) {
     return a + b;
 });
+
 auto minus = cppparsec::binop([](int a, int b) {
     return a - b;
 });

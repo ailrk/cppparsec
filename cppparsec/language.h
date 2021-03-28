@@ -21,3 +21,7 @@
 
 /* Defines common definitions that might be useful for parsing languages.
  * */
+
+#include "core.h"
+
+namespace cppparsec {} // namespace cppparsec

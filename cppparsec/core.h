@@ -229,7 +229,7 @@ struct parser_trait<parser<S, T>> {
 //! is ambiguos, add the type as the second template paramter to guide the type
 //! checker.
 template <stream::state_type S>
-inline decltype(auto)
+CPPPARSEC_INLINE decltype(auto)
 pure(auto a) {
     using T = decltype(a);
     return parser<S, T>([=](S state, const conts_t<S, T> &cont) {
@@ -285,6 +285,9 @@ class parser {
 
     parser(parser_fn<S, T> &&parse)
         : unparser(std::make_shared<parser_fn<S, T>>(std::move(parse))) {}
+
+    //! swap the content with another parser
+    void swap(parser<S, T> &other) { std::swap(*this, other); }
 
     reply<S, T> operator()(const S &state);
 
@@ -373,6 +376,18 @@ class parser {
             return q %= v;
         };
     }
+};
+
+template <stream::state_type S, typename T>
+class lazy_parser : public parser<S, T> {
+    std::optional<parser<S, T>> thunk;
+    const std::function<parser<S, T>()> generator;
+
+    lazy_parser()
+        : parser<S, T>()
+        , thunk() {}
+
+    void emplace() {}
 };
 
 //! This is the entrance of a parser. Once a parser is constructed, we can pass
@@ -830,10 +845,6 @@ many(P p) {
 
     return many_accum(accumulate, p);
 }
-
-// TODO: now just make a new empty vector. try to
-// reuse empty acc instead. skip many and return
-// nothing.
 
 //! parsing `p` until failed
 template <typename P, typename S = typename parser_trait<P>::stream_t,
