@@ -21,6 +21,7 @@
 
 /* This file defines utilities to represent errors in parser combinators.
  * */
+
 #include "stream.h"
 #include <algorithm>
 #include <concepts>

@@ -19,13 +19,13 @@
 // TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-
 /* This file defines the core utility of the parser combinator. The internal of
  * the parser combinator is fully cps transformed to support better error
  * messages and brack tracing. The parser is written in a monadic style, if you
  * are familiar with monadic parser combinator like `parsec` in hasekll, you
  * will be familiarwith many concepts here.
  */
+
 #pragma once
 #include <cassert>
 #include <concepts>

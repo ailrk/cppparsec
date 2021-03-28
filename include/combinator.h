@@ -23,6 +23,7 @@
  * contains generic combinators, and the second section defines combinators
  * specialized for string.
  * */
+
 #pragma once
 #include "core.h"
 #include "stream.h"

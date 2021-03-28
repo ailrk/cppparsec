@@ -19,8 +19,8 @@
 // TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-
 /* This file defines some useful tokens for parsing languages. */
+
 #pragma once
 #include "core.h"
 #include <variant>
