@@ -81,7 +81,7 @@ snoc(parser<S, T> p, parser<S, std::vector<T>> container) {
 //! convert a vector of parsers into a parser that return a vector.
 template <stream::state_type S, typename T>
 inline parser<S, std::vector<T>>
-collect(std::vector<parser<S, T>> ps) {
+collect(const std::vector<parser<S, T>> &ps) {
     auto r = parser<S, std::vector<T>>::pure({});
     for (auto iter = ps.rbegin(); iter != ps.rend(); ++iter) {
         auto &p = *iter;
@@ -217,6 +217,20 @@ template <stream::state_type S, typename T, typename End>
 parser<S, std::vector<T>>
 end_by1(parser<S, T> p, parser<S, End> end);
 
+//! binary operator wrapper.
+template <typename Fn, typename T = typename function_traits<Fn>::return_type>
+constexpr std::function<T(T, T)>
+binop(Fn fn) {
+    return std::function<T(T, T)>(fn);
+}
+
+//! unary operator wrapper.
+template <typename Fn, typename T = typename function_traits<Fn>::return_type>
+constexpr std::function<T(T)>
+unop(Fn fn) {
+    return std::function<T(T)>(fn);
+}
+
 //! parse 0 or more `p` separated by `op`, apply function in `op` on value
 //! returned by `p` in a left fold fasion.
 //! chainl1 can be useful to eliminate left recursion.
@@ -246,41 +260,31 @@ chainl1(parser<S, T> p, parser<S, std::function<T(T, T)>> op) {
     };
 }
 
-//!
 //! parse 0 or more `p` separated by `op`, apply function in `op` on value
 //! returned by `p` in a left fold fasion.
 //! Return default value t if there are no `p`.
-//!
 template <stream::state_type S, typename T>
 parser<S, T>
 chainl(parser<S, T> p, parser<S, std::function<T(T, T)>> fn, T t);
 
-//!
 //! parse 0 or more `p` separated by `op`, apply function in `op` on value
 //! returned by `p` in a right fold fasion.
-//!
 template <stream::state_type S, typename T>
 parser<S, T>
 chainr1(parser<S, T> p, parser<S, std::function<T(T, T)>> fn);
 
-//!
 //! parse 0 or more `p` separated by `op`, apply function in `op` on value
 //! returned by `p` in a right fold fasion.
 //! Return default value t if there are no `p`.
-//!
 template <stream::state_type S, typename T>
 parser<S, T>
 chainr(parser<S, T> p, parser<S, std::function<T(T, T)>> fn, T t);
 
-//!
 //! parse the end of file.
-//!
 template <stream::state_type S>
 parser<S, unit> eof;
 
-//!
 //! proceed when parser `p` fails.
-//!
 template <stream::state_type S, typename T>
 parser<S, unit>
 not_followed_by(parser<S, T> p) {
@@ -290,14 +294,11 @@ not_followed_by(parser<S, T> p) {
     });
 }
 
-//!
 //! try keep parsing `p` until the first occurence of `end`
-//!
 template <stream::state_type S, typename T, typename End>
 parser<S, std::vector<T>>
 many_till(parser<S, T> p, parser<S, End> end);
 
-//!
 //! handling recursive definitions.
 //! Because we can't declare without initialization in c++, it's tricky to have
 //! recursive definition. To walk around, we wrap the uninitialized value in
@@ -312,7 +313,7 @@ many_till(parser<S, T> p, parser<S, End> end);
 template <stream::state_type S, typename T>
 parser<S, T>
 placeholder(std::optional<parser<S, T>> p) {
-    return parser<S, T>([=](S state, Conts<S, T> cont) {
+    return parser<S, T>([=](S state, conts_t<S, T> cont) {
         parser<S, T> p1 = p.value();
         T a = p1(state).get();
         auto err = unknown_error(state);
@@ -328,9 +329,7 @@ namespace cppparsec {
 
 using namespace stream;
 
-//!
 //! success if parsed character satisfies the predicate.
-//!
 inline parser<string_state, char>
 satisfy(const std::function<bool(char)> &pred) {
     return token<string_state, char>(
@@ -340,9 +339,7 @@ satisfy(const std::function<bool(char)> &pred) {
         pred);
 }
 
-//!
 //! parse a single character `c`
-//!
 inline parser<string_state, char>
 
 ch(char c) {
@@ -352,12 +349,10 @@ ch(char c) {
            ("expect character: " + std::string(1, c));
 }
 
-//!
 //! parse one of the character in the vector `chars`
-//!
 inline parser<string_state, char>
 
-one_of(std::vector<char> chars) {
+one_of(const std::vector<char> &chars) {
     return satisfy([=](char c) {
                auto iter = std::find(chars.begin(), chars.end(), c);
                return iter == chars.end();
@@ -365,12 +360,10 @@ one_of(std::vector<char> chars) {
            "oneof";
 }
 
-//!
 //! parse the next character if it's not in the vector `chars`
-//!
 inline parser<string_state, char>
 
-none_of(std::vector<char> chars) {
+none_of(const std::vector<char> &chars) {
     return satisfy([=](char c) {
         auto iter = std::find(chars.begin(), chars.end(), c);
         return iter != chars.end();
@@ -385,42 +378,30 @@ inline parser<string_state, char>
             }) ^
             "space";
 
-//!
 //! skip continous spaces.
-//!
 inline parser<string_state, unit> spaces = skip_many(space) ^ "white space";
 
-//!
 //! unix new line
-//!
 inline parser<string_state, char>
 
     newline = ch('\n') ^ "lf new-line";
 
-//!
 //! crlf new line
-//!
 inline parser<string_state, char>
 
     crlf = (ch('\r') >> ch('\n')) ^ "crlf new-line";
 
-//!
 //! new line
-//!
 inline parser<string_state, char>
 
     endofline = (newline | crlf) ^ "new-line";
 
-//!
 //! tab
-//!
 inline parser<string_state, char>
 
     tab = ch('\t') ^ "tab";
 
-//!
 //! parse uppercase letters
-//!
 inline parser<string_state, char>
 
     upper = satisfy([](char c) {
@@ -428,9 +409,7 @@ inline parser<string_state, char>
             }) ^
             "uppercase letter";
 
-//!
 //! parse lower case letters
-//!
 inline parser<string_state, char>
 
     lower = satisfy([](char c) {
@@ -438,9 +417,7 @@ inline parser<string_state, char>
             }) ^
             "lowercase letter";
 
-//!
 //! parse alpha numeral letters.
-//!
 inline parser<string_state, char>
 
     alpha_num = satisfy([](char c) {
@@ -448,9 +425,7 @@ inline parser<string_state, char>
                 }) ^
                 "alpha numeral letter";
 
-//!
 //! parse letters.
-//!
 inline parser<string_state, char>
 
     alpha = satisfy([](char c) {
@@ -458,16 +433,12 @@ inline parser<string_state, char>
             }) ^
             "alpha letter";
 
-//!
 //! parse letters
-//!
 inline parser<string_state, char>
 
     letter = alpha;
 
-//!
 //! parse decimal digits
-//!
 inline parser<string_state, char>
 
     digit = satisfy([](char c) {
@@ -475,9 +446,7 @@ inline parser<string_state, char>
             }) ^
             "digit letter";
 
-//!
 //! parse a nonzero digit
-//!
 inline parser<string_state, char>
 
     nonzero = satisfy([](char c) {
@@ -514,17 +483,13 @@ inline parser<string_state, char>
                 }) ^
                 "hex digit letter";
 
-//!
 //! parse anuy characters.
-//!
 inline parser<string_state, char>
 
     any_char = satisfy(const_(true));
 
-//!
 //! convert a vector of char to string
-//!
-inline auto vec_to_str = [](std::vector<char> v) -> std::string {
+inline auto vec_to_str = [](const std::vector<char> &v) -> std::string {
     return std::string(v.begin(), v.end());
 };
 
@@ -533,18 +498,23 @@ inline auto vec_to_str = [](std::vector<char> v) -> std::string {
 // helper monanic functions
 namespace cppparsec {
 
-//!
+inline auto stod = [](const std::string &str) {
+    return std::stod(str);
+};
+
+inline auto stoi = [](const std::string &str) {
+    return std::stoi(str);
+};
+
 //! convert a parser of char vector to a parser of string.
-//!
 inline auto vstr =
-    [](std::vector<char> cs) -> parser<string_state, std::string> {
+    [](const std::vector<char> &cs) -> parser<string_state, std::string> {
     return pure<string_state>(vec_to_str(cs));
 };
 
-//!
 //! parse string.
-//!
-inline auto str = [](std::string s) -> parser<string_state, std::string> {
+inline auto str =
+    [](const std::string &s) -> parser<string_state, std::string> {
     if (s == "") {
         return pure<string_state, std::string>("");
     }

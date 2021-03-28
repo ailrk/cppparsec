@@ -215,10 +215,38 @@ TEST_CASE("parser map") {
         REQUIRE(r.get() == 1);
     }
 
-    SECTION("int -> char -> doube") {
+    SECTION("int -> char -> double 1") {
         // life time is ok because all parser get copied.
         auto p1 = p.map(fn).map(fn1).map(fn2).map(fn3);
         auto r = p1(s);
+        REQUIRE(r.get() == "string");
+    }
+
+    SECTION("int -> char -> double lifetime check 2") {
+        // life time is ok because all parser get copied.
+        auto r = p.map(fn).map(fn1).map(fn2).map(fn3)(s);
+        REQUIRE(r.get() == "string");
+    }
+
+    SECTION("int -> char -> double lifetime check 3") {
+        // life time is ok because all parser get copied.
+        auto p1 = p.map(fn);
+        auto p2 = p1.map(fn1);
+        auto p3 = p2.map(fn2);
+        auto p4 = p3.map(fn3);
+        auto r = p4(s);
+        REQUIRE(r.get() == "string");
+    }
+
+    SECTION("int -> char -> double lifetime check 3") {
+        // life time is ok because all parser get copied.
+        auto p1 = p.map(fn);
+        auto p2 = p1.map([]([[maybe_unused]] int v) -> char {
+            return 'a';
+        });
+        auto p3 = p2.map(fn2);
+        auto p4 = p3.map(fn3);
+        auto r = p4(s);
         REQUIRE(r.get() == "string");
     }
 
