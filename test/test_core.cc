@@ -478,3 +478,26 @@ TEST_CASE("attempt related") {
         REQUIRE(r == "abc");
     }
 }
+
+TEST_CASE("lazy parser") {
+    using namespace cppparsec;
+    using namespace cppparsec::stream;
+
+    string_state s("abc\ndef\nghi\n");
+    auto p = pure<string_state, int>(1);
+
+    SECTION("lazy parser ") {
+        lazy_parser<string_state, int> lp;
+        lp.emplace(pure<string_state>(10));
+        auto r = lp(s);
+        REQUIRE(r.get() == 10);
+    }
+
+    SECTION("lazy parser in combinator") {
+        lazy_parser<string_state, int> lp;
+        auto p1 = many(lp);
+        lp.emplace(pure<string_state>(10));
+        auto r = lp(s);
+        REQUIRE(r.get() == 10);
+    }
+}

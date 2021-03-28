@@ -22,6 +22,12 @@ target_include_directories(cppparsec INTERFACE
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/cppparsec>)
 
+set_target_properties(cppparsec PROPERTIES
+  C_VISIBILITY_PRESET       hidden
+  CXX_VISIBILITY_PRESET     hidden
+  VISIBILITY_INLINES_HIDDEN YES
+  )
+
 if (CPPPARSEC_BUILD_FUZZER AND CPPPARSEC_BUILD_TEST)
   message(FATAL_ERROR
     "Can't build fuzzer and test together. Please choose one.")

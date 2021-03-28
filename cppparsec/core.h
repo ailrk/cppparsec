@@ -36,15 +36,15 @@
 #include <variant>
 #include <vector>
 
+#include "common.h"
 #include "error.h"
 #include "stream.h"
-#include "util.h"
 
 namespace cppparsec {
 // The program is cps transformed, so it might
 // take a little bit dicipher works to read.
 
-using namespace cppparsec::util;
+using namespace cppparsec::common;
 
 //! representing the unit type.
 struct unit {};
@@ -53,7 +53,7 @@ struct unit {};
 // parsed result.  `consumed` and `ok` are used to indicate the state of the
 // parser.
 template <stream::state_type S, typename T>
-class reply {
+class CPPPARSEC_API reply {
     // NOTE: This will be the value get passed to
     // the next continuation in ok case.
   public:
@@ -191,6 +191,9 @@ using parser_fn = std::function<bool(S, conts_t<S, T>)>;
 template <stream::state_type S, typename T>
 class parser;
 
+template <stream::state_type S, typename T>
+class lazy_parser;
+
 // This declaration is just a hack.
 // Templated friend fcuntions need to declared somewhere.
 // | is an abelian group, * forms a monoid. Together with identity our parser
@@ -223,14 +226,20 @@ struct parser_trait<parser<S, T>> {
     using stream_t = typename parser<S, T>::stream_t;
 };
 
+template <typename S, typename T>
+struct parser_trait<lazy_parser<S, T>> {
+    using value_type = typename lazy_parser<S, T>::value_type;
+    using reply_t = typename lazy_parser<S, T>::reply_t;
+    using stream_t = typename lazy_parser<S, T>::stream_t;
+};
+
 //! Lift a value into the parser.
 //! The return type is deduced from the parameter get passed in, so the only
 //! required template parameter is the stream type. If the type of the parameter
 //! is ambiguos, add the type as the second template paramter to guide the type
 //! checker.
 template <stream::state_type S>
-CPPPARSEC_INLINE
-decltype(auto)
+CPPPARSEC_INLINE decltype(auto)
 pure(auto a) {
     using T = decltype(a);
     return parser<S, T>([=](S state, const conts_t<S, T> &cont) {
@@ -238,6 +247,27 @@ pure(auto a) {
         auto r = reply<S, T>::mk_empty_ok_reply(a, state, err);
         return cont.empty_ok(r);
     });
+}
+
+//! equivalence of pure, but create lazy parser instead. If no argument passed,
+//! lpur will construct an empty lazy parser, and it must be emplaced before
+//! being used. Thisis useful when dealing with recursive definitions.
+template <stream::state_type S>
+CPPPARSEC_INLINE decltype(auto)
+lpure(auto a) {
+    using T = decltype(a);
+    return parser<S, T>([=](S state, const conts_t<S, T> &cont) {
+        auto err = unknown_error(state);
+        auto r = reply<S, T>::mk_empty_ok_reply(a, state, err);
+        return cont.empty_ok(r);
+    });
+}
+
+//! create an empty lazy parser.
+template <stream::state_type S, typename T>
+CPPPARSEC_INLINE decltype(auto)
+lpure() {
+    return lazy_parser<S, T>();
 }
 
 //! a parser is a wrapper over a `shared_ptr` to the `parser_fn` with the type
@@ -287,8 +317,10 @@ class parser {
     parser(parser_fn<S, T> &&parse)
         : unparser(std::make_shared<parser_fn<S, T>>(std::move(parse))) {}
 
+    parser() = default;
+
     //! swap the content with another parser
-    void swap(parser<S, T> &other) { std::swap(*this, other); }
+    CPPPARSEC_INLINE void swap(parser<S, T> &other) { std::swap(*this, other); }
 
     reply<S, T> operator()(const S &state);
 
@@ -303,17 +335,18 @@ class parser {
 
     template <typename Fn,
               typename U = typename function_traits<Fn>::return_type>
-    parser<S, U> map(const Fn &fn);
+    CPPPARSEC_INLINE parser<S, U> map(const Fn &fn);
 
     template <typename Fm,
               typename U = typename parser_trait<
                   typename function_traits<Fm>::return_type>::value_type>
-    parser<S, U> bind(Fm fm);
+    CPPPARSEC_INLINE parser<S, U> bind(Fm fm);
 
     template <typename M, typename Fn = typename parser_trait<M>::value_type,
               typename U = typename function_traits<Fn>::return_type>
-    parser<S, U> apply(M m);
+    CPPPARSEC_INLINE parser<S, U> apply(M m);
 
+    CPPPARSEC_INLINE
     parser<S, T> alt(parser<S, T>);
 
     // create parser from a transition function. This is a low level helper, you
@@ -347,7 +380,7 @@ class parser {
     //! right assoicate.
     template <typename Fn,
               typename U = typename function_traits<Fn>::return_type>
-    parser<S, U> operator>(const Fn &fn) {
+    CPPPARSEC_INLINE parser<S, U> operator>(const Fn &fn) {
         return map(fn);
     }
 
@@ -356,14 +389,15 @@ class parser {
     template <typename Fm,
               typename U = typename parser_trait<
                   typename function_traits<Fm>::return_type>::value_type>
-    friend parser<S, U> operator>>=(parser<S, T> p, Fm fm) {
+    CPPPARSEC_INLINE friend parser<S, U> operator>>=(parser<S, T> p, Fm fm) {
         return p.bind(fm);
     }
 
     //! sequence operator
     //! right assoicate.
     template <typename U>
-    friend parser<S, U> operator>>(parser<S, T> p, parser<S, U> q) {
+    CPPPARSEC_INLINE friend parser<S, U> operator>>(parser<S, T> p,
+                                                    parser<S, U> q) {
         return p >>= [=]([[maybe_unused]] T _) {
             return q;
         };
@@ -372,7 +406,8 @@ class parser {
     //! parse `p` and `q` consecutively, and return the value of `p`.
     //! right assoicate
     template <typename U>
-    friend parser<S, T> operator<<(parser<S, T> p, parser<S, U> q) {
+    CPPPARSEC_INLINE friend parser<S, T> operator<<(parser<S, T> p,
+                                                    parser<S, U> q) {
         return p >>= [=](T v) {
             return q %= v;
         };
@@ -382,13 +417,17 @@ class parser {
 template <stream::state_type S, typename T>
 class lazy_parser : public parser<S, T> {
     std::optional<parser<S, T>> thunk;
-    const std::function<parser<S, T>()> generator;
 
+  public:
     lazy_parser()
-        : parser<S, T>()
-        , thunk() {}
+        : thunk() {}
 
-    void emplace() {}
+    void emplace(auto... args) {
+        thunk.emplace(std::forward<decltype(args)...>(args)...);
+        CPPPARSEC_TRY { this->swap(thunk.value()); }
+        CPPPARSEC_CATCH(std::bad_optional_access e) { return; }
+        thunk.reset();
+    }
 };
 
 //! This is the entrance of a parser. Once a parser is constructed, we can pass
@@ -440,7 +479,7 @@ parser<S, T>::operator()(const S &state) {
 //! note: this function is also provded by `operator>()`
 template <stream::state_type S, typename T>
 template <typename Fn, typename U>
-parser<S, U>
+CPPPARSEC_INLINE parser<S, U>
 parser<S, T>::map(const Fn &fn) {
     static_assert(std::is_convertible_v<Fn, std::function<U(T)>>,
                   "Function to map has the wrong type");
@@ -785,7 +824,7 @@ many_accum(AccumFn fn, parser<S, T> p) {
                     // the program?
                     .empty_ok =
                         [](reply<S, T> rep) {
-                            throw bad_many_combinator();
+                            CPPPARSEC_THROW(bad_many_combinator());
                             return rep.ok;
                         },
 
@@ -821,7 +860,7 @@ many_accum(AccumFn fn, parser<S, T> p) {
                 .consumed_err = cont.consumed_err,
 
                 .empty_ok = [](reply<S, T> rep) -> bool {
-                    throw bad_many_combinator();
+                    CPPPARSEC_THROW(bad_many_combinator());
                     return rep.ok;
                 },
 
@@ -946,7 +985,7 @@ add_expected_message(parser_error &error,
 //! auto parser = ch('a') ^ "error";
 //! ```
 template <stream::state_type S, typename T>
-parser<S, T>
+CPPPARSEC_API CPPPARSEC_INLINE parser<S, T>
 labels(parser<S, T> p, const std::vector<std::string> &msgs) {
     return parser<S, T>([msgs, p](S state, const conts_t<S, T> &cont) {
         auto empty_ok = [cont, msgs](reply<S, T> rep) -> bool {
@@ -980,7 +1019,7 @@ labels(parser<S, T> p, const std::vector<std::string> &msgs) {
 //! behave like p, but replace the error message
 //! with `msg`.
 template <stream::state_type S, typename T>
-parser<S, T>
+CPPPARSEC_API CPPPARSEC_INLINE parser<S, T>
 label(parser<S, T> p, const std::string &msg) {
     return labels(p, { msg });
 }
@@ -988,7 +1027,8 @@ label(parser<S, T> p, const std::string &msg) {
 //! behave like p, but replace the error message
 //! with `msg`.
 template <stream::state_type S, typename T>
-parser<S, T>
+
+CPPPARSEC_API CPPPARSEC_INLINE parser<S, T>
 operator^(parser<S, T> p, const std::string &msg) {
     return label(p, { msg });
 }
@@ -1007,7 +1047,8 @@ operator^(parser<S, T> p, const std::string &msg) {
 //!
 //! ```
 template <stream::state_type S, typename T, typename U>
-parser<S, U>
+
+CPPPARSEC_API CPPPARSEC_INLINE parser<S, U>
 operator%=(parser<S, T> p, U x) {
     return p >> pure<S>(x);
 }

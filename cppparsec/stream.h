@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include "common.h"
 #include <cassert>
 #include <concepts>
 #include <iostream>
@@ -35,11 +36,12 @@
 #include <type_traits>
 
 namespace cppparsec {
+using namespace common;
 
 //! Position can't change itself. it can only be updated by String.
 //! the reason is Position doesn't have information about what character
 //! it's rading, so it doesn't know if it need to increment col or line.
-struct src_position {
+struct src_position CPPPARSEC_API {
     size_t line;
     size_t col;
     size_t index; // the index in a container. e.g the index in a string.
@@ -80,7 +82,8 @@ struct src_position {
     }
 };
 
-inline std::unique_ptr<src_position>
+//! get an unique ptr of a default starting position.
+CPPPARSEC_INLINE std::unique_ptr<src_position>
 make_default_init_position_unique_ptr() {
     src_position *sq = new src_position{ 1, 1, 0 };
     return std::unique_ptr<src_position>(sq);
@@ -128,7 +131,7 @@ concept state_type = requires(T t) {
 };
 
 // stream type based on string_view.
-class string_state {
+class string_state CPPPARSEC_API {
 
     std::string_view data;
     std::unique_ptr<src_position> position;

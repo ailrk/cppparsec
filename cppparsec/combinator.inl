@@ -42,7 +42,9 @@ namespace cppparsec {
 
 //! try a vector of parser until succeed.
 template <stream::state_type S, typename T>
-CPPPARSEC_API CPPPARSEC_API CPPPARSEC_INLINE parser<S, T>
+CPPPARSEC_API CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, T>
 choice(std::vector<parser<S, T>> options) {
     parser<S, T> result = zerop<S, T>;
     for (auto &o : options) {
@@ -54,7 +56,9 @@ choice(std::vector<parser<S, T>> options) {
 //! push the result of parser `p` into the head of the result of parser
 //! `container`
 template <stream::state_type S, typename T>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, std::vector<T>>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, std::vector<T>>
 cons(parser<S, T> p, parser<S, std::vector<T>> container) {
     return p >>= [=](T v) {
         return container >>= [=](std::vector<T> vs) {
@@ -68,7 +72,9 @@ cons(parser<S, T> p, parser<S, std::vector<T>> container) {
 //! push the result of parser `p` to the end of the result of parser
 //! `container`
 template <stream::state_type S, typename T>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, std::vector<T>>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, std::vector<T>>
 snoc(parser<S, T> p, parser<S, std::vector<T>> container) {
     return p >>= [=](T v) {
         return container >>= [=](std::vector<T> vs) {
@@ -80,7 +86,9 @@ snoc(parser<S, T> p, parser<S, std::vector<T>> container) {
 
 //! convert a vector of parsers into a parser that return a vector.
 template <stream::state_type S, typename T>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, std::vector<T>>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, std::vector<T>>
 collect(const std::vector<parser<S, T>> &ps) {
     auto r = parser<S, std::vector<T>>::pure({});
     for (auto iter = ps.rbegin(); iter != ps.rend(); ++iter) {
@@ -92,7 +100,9 @@ collect(const std::vector<parser<S, T>> &ps) {
 
 //! count the number of times parser `p` succeed.
 template <stream::state_type S, typename T>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, std::vector<T>>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, std::vector<T>>
 count(uint32_t n, parser<S, T> p) {
     using Replicate =
         std::function<parser<S, std::vector<T>>(uint32_t, std::vector<T>)>;
@@ -119,7 +129,9 @@ count(uint32_t n, parser<S, T> p) {
 template <typename P, typename Open, typename Close,
           typename S = typename parser_trait<P>::stream_t,
           typename T = typename parser_trait<P>::value_type>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, T>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, T>
 between(Open o, Close c, P p) {
     return o >> (p >>= [=](T v) {
                return c >> pure<S>(v);
@@ -128,14 +140,18 @@ between(Open o, Close c, P p) {
 
 //! parser `p`. If it's failed without consume anything, return t.
 template <stream::state_type S, typename T>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, T>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, T>
 with_default(T t, parser<S, T> p) {
     return p | pure<S>(t);
 }
 
 //! parser `p`, if it's failed without consume anything, return std::nullopt.
 template <stream::state_type S, typename T>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, std::optional<T>>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, std::optional<T>>
 maybe(parser<S, T> p) {
     return with_default({}, p.map([](T v) -> std::optional<T> {
         return { v };
@@ -144,18 +160,24 @@ maybe(parser<S, T> p) {
 
 //! parse any token.
 template <stream::state_type S>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, std::any> any_token;
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, std::any> any_token;
 
 //! skip at least 1 and return nothing.
 template <stream::state_type S, typename T>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, unit>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, unit>
 skip_many1(parser<S, T> p) {
     return p >> skip_many(p);
 }
 
 //! parse `p` 1 or more times.
 template <stream::state_type S, typename T>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, std::vector<T>>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, std::vector<T>>
 many1(parser<S, T> p) {
     return cons(p, many(p));
 }
@@ -164,7 +186,9 @@ many1(parser<S, T> p) {
 template <typename P, typename Sep,
           typename S = typename parser_trait<P>::stream_t,
           typename T = typename parser_trait<P>::value_type>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, std::vector<T>>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, std::vector<T>>
 sep_by1(P p, Sep sep) {
     return cons(p, many1(sep >> p));
 }
@@ -173,7 +197,9 @@ sep_by1(P p, Sep sep) {
 template <typename P, typename Sep,
           typename S = typename parser_trait<P>::stream_t,
           typename T = typename parser_trait<P>::value_type>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, std::vector<T>>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, std::vector<T>>
 sep_by(P p, Sep sep) {
     return attempt(sep_by1(p, sep)) | pure<S>(std::vector<T>{});
 }
@@ -181,13 +207,17 @@ sep_by(P p, Sep sep) {
 //! parse `p` 0 or more times separated by `sepend`. It's also optional to end
 //! with a `sepend`.
 template <stream::state_type S, typename T, typename SepEnd>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, std::vector<T>>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, std::vector<T>>
 sepend_by(parser<S, T> p, parser<S, SepEnd> sepend);
 
 //! parser `p` 0 or more times separated by sepend. it's allowed to end the
 //! result with a SepEnd
 template <stream::state_type S, typename T, typename SepEnd>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, std::vector<T>>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, std::vector<T>>
 sepend_by1(parser<S, T> p, parser<S, SepEnd> sepend) {
     return p >>= [=](T v) {
         return sepend >> sepend_by(p, sepend) >>= [=](std::vector<T> vs) {
@@ -199,7 +229,9 @@ sepend_by1(parser<S, T> p, parser<S, SepEnd> sepend) {
 //! parser `p` 0 or more times separated by sepend. it's allowed to end the
 //! result with a SepEnd
 template <stream::state_type S, typename T, typename SepEnd>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, std::vector<T>>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, std::vector<T>>
 sepend_by(parser<S, T> p, parser<S, SepEnd> sepend) {
     return sepend_by1(p, sepend) | pure<S, std::vector<T>>({});
 }
@@ -208,24 +240,32 @@ sepend_by(parser<S, T> p, parser<S, SepEnd> sepend) {
 template <typename P, typename End,
           typename S = typename parser_trait<P>::stream_t,
           typename T = typename parser_trait<P>::value_type>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, std::vector<T>>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, std::vector<T>>
 end_by(P p, End end);
 
 //! parser `p` 1 or more times ended by end
 template <stream::state_type S, typename T, typename End>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, std::vector<T>>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, std::vector<T>>
 end_by1(parser<S, T> p, parser<S, End> end);
 
 //! binary operator wrapper.
 template <typename Fn, typename T = typename function_traits<Fn>::return_type>
-CPPPARSEC_CONSTEXPR CPPPARSEC_API CPPPARSEC_INLINE std::function<T(T, T)>
+CPPPARSEC_CONSTEXPR CPPPARSEC_API
+CPPPARSEC_INLINE
+std::function<T(T, T)>
 binop(Fn fn) {
     return std::function<T(T, T)>(fn);
 }
 
 //! unary operator wrapper.
 template <typename Fn, typename T = typename function_traits<Fn>::return_type>
-CPPPARSEC_CONSTEXPR CPPPARSEC_API CPPPARSEC_INLINE std::function<T(T)>
+CPPPARSEC_CONSTEXPR CPPPARSEC_API
+CPPPARSEC_INLINE
+std::function<T(T)>
 unop(Fn fn) {
     return std::function<T(T)>(fn);
 }
@@ -235,7 +275,9 @@ unop(Fn fn) {
 //! chainl1 can be useful to eliminate left recursion.
 template <stream::state_type S, typename T,
           typename Binop = std::function<T(T, T)>>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, T>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, T>
 chainl1(parser<S, T> p, parser<S, Binop> op) {
 
     using E = std::variant<T, Binop>;
@@ -252,13 +294,12 @@ chainl1(parser<S, T> p, parser<S, Binop> op) {
             T b = x;
             for (std::tuple<E, E> n : buf) {
                 // if binop and value are not in the right order, just skip.
-                if (!std::holds_alternative<Binop>(std::get<0>(n)) ||
-                    !std::holds_alternative<T>(std::get<1>(n))) {
-                    continue;
-                } else {
+                try {
                     auto f = std::get<Binop>(std::get<0>(n));
                     auto y = std::get<T>(std::get<1>(n));
                     b = f(b, y);
+                } catch (std::bad_variant_access e) {
+                    continue;
                 }
             }
             return pure<S>(b);
@@ -270,7 +311,9 @@ chainl1(parser<S, T> p, parser<S, Binop> op) {
 //! returned by `p` in a left fold fasion.
 //! Return default value t if there are no `p`.
 template <stream::state_type S, typename T>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, T>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, T>
 chainl(parser<S, T> p, parser<S, std::function<T(T, T)>> op, T t) {
     return chainl1(p, op) | pure<S>(t);
 }
@@ -278,19 +321,25 @@ chainl(parser<S, T> p, parser<S, std::function<T(T, T)>> op, T t) {
 //! parse 0 or more `p` separated by `op`, apply function in `op` on value
 //! returned by `p` in a right fold fasion.
 template <stream::state_type S, typename T>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, T>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, T>
 chainr1(parser<S, T> p, parser<S, std::function<T(T, T)>> fn);
 
 //! parse 0 or more `p` separated by `op`, apply function in `op` on value
 //! returned by `p` in a right fold fasion.
 //! Return default value t if there are no `p`.
 template <stream::state_type S, typename T>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, T>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, T>
 chainr(parser<S, T> p, parser<S, std::function<T(T, T)>> fn, T t);
 
 //! proceed when parser `p` fails.
 template <stream::state_type S, typename T>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, unit>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, unit>
 not_followed_by(parser<S, T> p) {
     return attempt(attempt(p) >>= [=](T v) {
         // default use to_string to print the value
@@ -300,12 +349,15 @@ not_followed_by(parser<S, T> p) {
 
 //! parse the end of file.
 template <stream::state_type S>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, unit>
-    eof = not_followed_by(any_token<S>) ^ "end of input";
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, unit> eof = not_followed_by(any_token<S>) ^ "end of input";
 
 //! try keep parsing `p` until the first occurence of `end`
 template <stream::state_type S, typename T, typename End>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, std::vector<T>>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, std::vector<T>>
 many_till(parser<S, T> p, parser<S, End> end);
 
 //! handling recursive definitions.
@@ -320,7 +372,9 @@ many_till(parser<S, T> p, parser<S, End> end);
 //!   expr_.emplace(expr);
 //! ```
 template <stream::state_type S, typename T>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, T>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, T>
 placeholder(std::optional<parser<S, T>> *p) {
     return parser<S, T>([=](S state, conts_t<S, T> cont) {
         parser<S, T> p1 = p->value();
@@ -333,7 +387,9 @@ placeholder(std::optional<parser<S, T>> *p) {
 
 //! create a lazy parser that needs to be initialized later.
 template <stream::state_type S, typename T>
-CPPPARSEC_API CPPPARSEC_INLINE parser<S, T>
+CPPPARSEC_API
+CPPPARSEC_INLINE
+parser<S, T>
 lazy() {
     auto plazy{ std::make_unique<std::optional<parser<S, T>>>({}) };
 }
@@ -503,7 +559,9 @@ parser<string_state, char>
         return c > '0' && c < '9';
     });
 
-static CPPPARSEC_INLINE bool
+static CPPPARSEC_API
+CPPPARSEC_INLINE
+bool
 ishex(char c) {
     return c == 'a' || c == 'b' || c == 'c' || c == 'd' || c == 'e' ||
            c == 'f' || c == 'A' || c == 'B' || c == 'C' || c == 'D' ||
@@ -518,7 +576,9 @@ parser<string_state, char> hex_digit = satisfy([](char c) {
                                        }) ^
                                        "hex digit letter";
 
-static CPPPARSEC_INLINE bool
+static CPPPARSEC_API
+CPPPARSEC_INLINE
+bool
 isoct(char c) {
     return c == '1' || c == '2' || c == '3' || c == '4' || c == '5' ||
            c == '6' || c == '7' || c == '0';
